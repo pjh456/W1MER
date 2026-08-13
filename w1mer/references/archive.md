@@ -13,11 +13,14 @@ indexes.
 ```sh
 w1mer init                       # scaffold the planning directory from templates
 w1mer new <type> [--parent <id>] [--title "..."] [--slug <text>]
-w1mer set <type> <id> --state <state>
+w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
 w1mer list [--type <type>] [--sort tree]
 w1mer build                      # regenerate all INDEX files
 w1mer sync [--apply]             # compact deltas into stable codebase docs
 ```
+
+`task` rows live in `ROADMAP.md`; `set task 01 --state done --effect "+22%"`
+updates a row directly. Other types are per-entry files.
 
 ## Type registry
 

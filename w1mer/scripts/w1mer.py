@@ -268,6 +268,13 @@ def find_file(tdef, cfg, nid):
 
 def cmd_set(cwd, cfg, args):
     tdef = get_type(cfg, args.type)
+    if args.type == "task":
+        if not args.state and not args.effect:
+            sys.exit("error: provide --state and/or --effect for task rows")
+        set_roadmap_task(cwd, args)
+        return
+    if not args.state:
+        sys.exit("error: --state required for non-task types")
     path = find_file(tdef, cfg, args.id)
     states = tdef.get("states", [])
     if states and args.state not in states:
@@ -277,6 +284,36 @@ def cmd_set(cwd, cfg, args):
     write_frontmatter(path, meta, body)
     rel = path.resolve().relative_to(Path(cwd).resolve())
     print(f"{rel}: state -> {args.state}")
+
+
+def set_roadmap_task(cwd, args):
+    """Update a task row in ROADMAP.md: status (--state) and/or effect (--effect).
+    Row format: | id | task | doc | status | effect |"""
+    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    if not road.exists():
+        sys.exit("error: .w1mer/ROADMAP.md missing (run 'w1mer init')")
+    text = road.read_text(encoding="utf-8")
+    pattern = re.compile(rf"^(\| {re.escape(str(args.id))} \|)([^\n]*?)(\|)$", re.M)
+    m = pattern.search(text)
+    if not m:
+        sys.exit(f"error: task {args.id} not found in ROADMAP.md")
+    cells = [p.strip() for p in m.group(2).split("|")]
+    # cells: ['', task, doc, status, effect, ''] → drop empties but keep effect if blank
+    while cells and cells[-1] == "":
+        cells.pop()
+    while cells and cells[0] == "":
+        cells.pop(0)
+    # cells now: [task, doc, status, effect?]; pad to 4
+    while len(cells) < 4:
+        cells.append("")
+    if args.state:
+        cells[2] = args.state
+    if args.effect:
+        cells[3] = args.effect
+    new_row = "| " + str(args.id) + " | " + " | ".join(cells) + " |"
+    text = text[: m.start()] + new_row + text[m.end():]
+    road.write_text(text, encoding="utf-8")
+    print(f"task {args.id}: state={cells[2]} effect={cells[3]}")
 
 
 def preorder_sort(ids):
@@ -296,6 +333,9 @@ def cmd_list(cwd, cfg, args):
         types = cfg.get("types", {})
     root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
     for tname, tdef in types.items():
+        if tname == "task":
+            list_roadmap_tasks(cwd)
+            continue
         files = collect_files(tdef, cfg)
         if not files:
             continue
@@ -303,6 +343,21 @@ def cmd_list(cwd, cfg, args):
         for nid in preorder_sort(files):
             meta, _ = read_frontmatter(files[nid])
             print(f"  {nid:<8} {meta.get('state','?'):<14} {meta.get('title','')}")
+
+
+def list_roadmap_tasks(cwd):
+    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    if not road.exists():
+        return
+    rows = []
+    for line in road.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\| (\d+(?:\.\d+)*) \|([^|]+)\|([^|]+)\|([^|]+)\|", line)
+        if m:
+            rows.append((m.group(1), m.group(4).strip(), m.group(2).strip()))
+    if rows:
+        print("\n[task]")
+    for nid, status, title in sorted(rows, key=lambda r: tuple(int(p) for p in r[0].split("."))):
+        print(f"  {nid:<8} {status:<14} {title}")
 
 
 def cmd_build(cwd, cfg):
@@ -415,10 +470,11 @@ def main():
     p_new.add_argument("--domain", default=None, help="perf domain")
     p_new.add_argument("--state", default="todo", help="initial state")
 
-    p_set = sub.add_parser("set", help="update an entry's state")
+    p_set = sub.add_parser("set", help="update an entry's state (task also accepts --effect)")
     p_set.add_argument("type")
     p_set.add_argument("id")
-    p_set.add_argument("--state", required=True)
+    p_set.add_argument("--state", default=None)
+    p_set.add_argument("--effect", default=None, help="effect summary (task rows only)")
 
     p_list = sub.add_parser("list", help="list entries")
     p_list.add_argument("--type", default=None)
