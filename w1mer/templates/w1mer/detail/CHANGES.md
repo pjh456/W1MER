@@ -12,4 +12,9 @@ state: active
 
 ## Deltas
 
+> One bullet per delta, tagged with the target stable doc:
+> `- [ARCHITECTURE] contract X moved`. Tags: STACK / STRUCTURE /
+> ARCHITECTURE / INTEGRATIONS / CONVENTIONS. Untagged → unassigned.
+> `w1mer sync` shows a grouped preview; `w1mer sync --apply` writes + clears.
+
 - (empty)

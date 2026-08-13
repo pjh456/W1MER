@@ -55,6 +55,7 @@ reviewer notes ── accumulate in detail/CHANGES.md ── compact ──> cod
                                           └──── changelog cleared ───────┘
 ```
 
-A periodic **compact** pass (orchestrator or a dedicated agent) turns the
-accumulated notes into a merge draft for human/agent confirmation before
-applying.
+A periodic compact (`w1mer sync --apply`, or reviewed by the orchestrator
+first) turns the accumulated notes into stable-layer updates. Delta lines are
+tagged with their target doc, e.g. `- [ARCHITECTURE] contract X moved`.
+Untagged lines are listed as unassigned for manual triage.

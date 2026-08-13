@@ -16,6 +16,7 @@ w1mer new <type> [--parent <id>] [--title "..."] [--slug <text>]
 w1mer set <type> <id> --state <state>
 w1mer list [--type <type>] [--sort tree]
 w1mer build                      # regenerate all INDEX files
+w1mer sync [--apply]             # compact deltas into stable codebase docs
 ```
 
 ## Type registry

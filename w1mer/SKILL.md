@@ -84,6 +84,7 @@ w1mer new <type> [--parent <id>] [--title "..."]   # create an entry
 w1mer set <type> <id> --state <state>              # update state
 w1mer list [--type <type>]                         # list entries
 w1mer build                                        # regenerate all INDEX files
+w1mer sync [--apply]                               # compact deltas into stable docs
 ```
 
 The type registry lives in `w1mer.yaml` (directory, file-naming pattern,

@@ -335,6 +335,71 @@ def cmd_build(cwd, cfg):
         print(f"built {rel}  ({len(rows)} rows)")
 
 
+STABLE_DOCS = ("STACK", "STRUCTURE", "ARCHITECTURE", "INTEGRATIONS", "CONVENTIONS")
+
+
+def cmd_sync(cwd, cfg, args):
+    """Compact: merge architecture-impact deltas from detail/CHANGES.md into
+    the stable codebase docs. Each delta line is tagged:
+      - [ARCHITECTURE] contract X changed
+    Untagged lines are listed as 'unassigned'. --apply writes the deltas
+    under a dated heading in each target doc and clears CHANGES.md."""
+    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    changes = root / "detail" / "CHANGES.md"
+    if not changes.exists():
+        sys.exit("error: .w1mer/detail/CHANGES.md missing (run 'w1mer init')")
+    meta, body = read_frontmatter(changes)
+    deltas = []
+    in_deltas = False
+    for line in body.splitlines():
+        if line.strip() == "## Deltas":
+            in_deltas = True
+            continue
+        if in_deltas and line.strip().startswith("- "):
+            item = line.strip()[2:].strip()
+            if item and item != "(empty)":
+                deltas.append(item)
+    if not deltas:
+        print("no deltas in detail/CHANGES.md")
+        return
+    tagged = {d: [] for d in STABLE_DOCS}
+    unassigned = []
+    for d in deltas:
+        m = re.match(r"^\[(\w+)\]\s*(.*)$", d)
+        if m and m.group(1) in tagged:
+            tagged[m.group(1)].append(m.group(2))
+        else:
+            unassigned.append(d)
+    if not args.apply:
+        for doc in STABLE_DOCS:
+            if tagged[doc]:
+                print(f"-> {doc}.md")
+                for t in tagged[doc]:
+                    print(f"    {t}")
+        if unassigned:
+            print("-> unassigned")
+            for t in unassigned:
+                print(f"    {t}")
+        print("(dry run; use --apply to write)")
+        return
+    # apply: append dated heading + deltas to each stable doc, then clear CHANGES
+    today = datetime.date.today().isoformat()
+    for doc in STABLE_DOCS:
+        if not tagged[doc]:
+            continue
+        path = root / "codebase" / f"{doc}.md"
+        if not path.exists():
+            sys.exit(f"error: {path} missing")
+        block = "\n".join(f"- {t}" for t in tagged[doc])
+        text = path.read_text(encoding="utf-8").rstrip() + f"\n\n## Compact {today}\n\n{block}\n"
+        path.write_text(text, encoding="utf-8")
+        print(f"updated {doc}.md  (+{len(tagged[doc])} deltas)")
+    new_body = body
+    new_body = re.sub(r"(?ms)^## Deltas\n\n- .*$", "## Deltas\n\n- (empty)", new_body)
+    write_frontmatter(changes, meta, new_body)
+    print("cleared detail/CHANGES.md")
+
+
 # ---------------------------------------------------------------------------
 
 def main():
@@ -360,6 +425,9 @@ def main():
 
     sub.add_parser("build", help="regenerate INDEX files")
 
+    p_sync = sub.add_parser("sync", help="compact architecture deltas into stable codebase docs")
+    p_sync.add_argument("--apply", action="store_true", help="write deltas + clear CHANGES (default: dry run)")
+
     args = p.parse_args()
     if args.cmd == "init":
         cmd_init(Path.cwd())
@@ -373,6 +441,8 @@ def main():
         cmd_list(Path.cwd(), cfg, args)
     elif args.cmd == "build":
         cmd_build(Path.cwd(), cfg)
+    elif args.cmd == "sync":
+        cmd_sync(Path.cwd(), cfg, args)
 
 
 if __name__ == "__main__":
