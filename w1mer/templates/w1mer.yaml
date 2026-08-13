@@ -1,0 +1,44 @@
+# W1MER archive type registry
+# Copy to project root as `w1mer.yaml`, adjust per project.
+# Types declare: directory, file-naming pattern, state machine.
+# Content files are the source of truth; INDEX files are `w1mer build` artifacts.
+
+planning_dir: ".w1mer"
+
+types:
+  task:
+    dir: "ROADMAP.md"           # special: single table file, one row per task
+    id: "{seq:02}"              # 01, 02, ...; children via --parent (05.1, 05.1.1)
+    index: [id, title, status, effect]
+    states: [todo, doing, done, pending-review, reviewed, reviewed-issues, fixed, re-reviewed]
+
+  review:
+    dir: "review"
+    id: "R_{roadmap}"           # derived from parent task id; "." -> "_"
+    file: "{id}.md"
+    index: [id, task, state, doc]
+    states: [pending, ok, issues, fixed, re-reviewed]
+
+  bug:
+    dir: "bug_reason"
+    id: "B{seq:03}"
+    file: "{id}_{slug}.md"
+    index: [id, title, error, module, doc]
+    states: [open, fixed]
+
+  perf:
+    dir: "performance"
+    id: "PERF_{domain}_{seq:02}"   # domain: gc|property|array|coercion|string|call|ic_dispatch|compile
+    file: "{id}.md"
+    index: [id, title, domain, state, doc]
+    states: [pending, reviewing, optimizing, retesting, done, shelved]
+
+  detail:
+    dir: "detail"
+    id: "{seq:02}"               # 01, 02, ...
+    file: "{id}_{slug}.md"
+    index: [id, title, state, doc]
+    states: [active, archived]
+
+# Optional: language of generated docs
+lang: en

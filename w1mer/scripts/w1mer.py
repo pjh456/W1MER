@@ -1,0 +1,379 @@
+#!/usr/bin/env python3
+"""w1mer — metadata-driven archive CLI.
+
+Single-file, stdlib-only. Operates the .w1mer/ planning archive defined by
+the w1mer.yaml type registry. Content files are the source of truth; INDEX
+files are build artifacts (single-direction sync).
+
+Commands:
+  init                    scaffold .w1mer/ from templates + copy w1mer.yaml
+  new <type> [args]       create an entry (auto-increments the id)
+  set <type> <id> --state <state>   update an entry's state
+  list [--type <type>]    list entries (tree order for ids)
+  build                   regenerate all INDEX files
+"""
+
+import argparse
+import datetime
+import re
+import shutil
+import sys
+from pathlib import Path
+
+TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+CONFIG_NAME = "w1mer.yaml"
+
+# ---------------------------------------------------------------------------
+# minimal YAML subset (key: value, nested 2-space blocks, dash lists, # comments)
+# ---------------------------------------------------------------------------
+
+
+def parse_yaml(text):
+    root = {}
+    stack = []  # (indent, dict)
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        line = line.strip()
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        container = stack[-1][1] if stack else root
+        if line.startswith("- "):
+            raise ValueError("top-level dash lists not supported")
+        if ": " in line:
+            key, _, value = line.partition(": ")
+            value = value.strip()
+            if value.startswith("[") and value.endswith("]"):
+                value = [v.strip().strip("\"'") for v in value[1:-1].split(",") if v.strip()]
+            elif value:
+                value = value.strip("\"'")
+            container[key] = value
+        elif line.endswith(":"):
+            key = line[:-1].strip()
+            child = {}
+            container[key] = child
+            stack.append((indent, child))
+        else:
+            raise ValueError(f"cannot parse line: {raw!r}")
+    return root
+
+
+def load_config(cwd):
+    path = Path(cwd) / CONFIG_NAME
+    if not path.exists():
+        sys.exit(f"error: {CONFIG_NAME} not found (run 'w1mer init' first)")
+    return parse_yaml(path.read_text(encoding="utf-8"))
+
+
+def get_type(cfg, name):
+    types = cfg.get("types", {})
+    if name not in types:
+        sys.exit(f"error: unknown type '{name}'. Known: {', '.join(types)}")
+    return types[name]
+
+
+# ---------------------------------------------------------------------------
+# frontmatter
+# ---------------------------------------------------------------------------
+
+
+def read_frontmatter(path):
+    text = path.read_text(encoding="utf-8")
+    m = re.match(r"^---\n(.*?)\n---\n?", text, re.S)
+    if not m:
+        return {}, text
+    meta = {}
+    for line in m.group(1).splitlines():
+        if ": " in line:
+            k, _, v = line.partition(": ")
+            meta[k.strip()] = v.strip()
+    return meta, text[m.end():]
+
+
+def write_frontmatter(path, meta, body):
+    fm = "---\n" + "".join(f"{k}: {v}\n" for k, v in meta.items()) + "---\n"
+    path.write_text(fm + body, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# ids
+# ---------------------------------------------------------------------------
+
+
+def next_id(tdef, parent=None, domain=None, existing=()):
+    """Compute the next id for a type.
+
+    parent    → derived id (R_{roadmap} style: dots become underscores)
+    domain    → substituted into {domain} placeholders (perf)
+    existing  → iterable of existing ids, for {seq:N} auto-increment
+    """
+    pattern = tdef.get("id", "")
+    if parent is not None:
+        return pattern.replace("{roadmap}", str(parent).replace(".", "_"))
+    if domain is not None:
+        pattern = pattern.replace("{domain}", domain)
+    m = re.search(r"\{seq:(\d+)\}", pattern)
+    if m:
+        width = int(m.group(1))
+        prefix = pattern[: m.start()]
+        nums = []
+        for e in existing:
+            if str(e).startswith(prefix):
+                num = re.search(r"(\d+)$", str(e))
+                if num:
+                    nums.append(int(num.group(1)))
+        n = max(nums) + 1 if nums else 1
+        return prefix + str(n).zfill(width)
+    return pattern
+
+
+def task_existing_ids(text):
+    """Collect existing task ids from ROADMAP rows: | 05 |, | 05.1 |, ..."""
+    return re.findall(r"^\| (\d+(?:\.\d+)*) ", text, re.M)
+
+
+# ---------------------------------------------------------------------------
+# templates
+# ---------------------------------------------------------------------------
+
+BODY_TEMPLATES = {
+    "review": "# Review {id}\n\nStatus: {state}\n\n## Conclusion\n\n(one paragraph)\n\n## Findings\n\n- \n",
+    "bug": "# Bug {id}\n\nStatus: {state}\n\n## Symptom\n\n(what fails / error message)\n\n## Root cause\n\n(diagnosis)\n\n## Fix\n\n(approach)\n",
+    "detail": "# Detail {id}\n\nStatus: {state}\n\n(body)\n",
+    "perf": "# PERF {id}\n\nStatus: {state}\n\n## Bottleneck\n\n## Approach\n\n## Expected value\n\n",
+}
+
+
+# ---------------------------------------------------------------------------
+# commands
+# ---------------------------------------------------------------------------
+
+
+def cmd_init(cwd):
+    dst = Path(cwd) / ".w1mer"
+    if dst.exists() and any(dst.iterdir()):
+        sys.exit("error: .w1mer/ already exists and is not empty")
+    dst.mkdir(parents=True, exist_ok=True)
+    src = TEMPLATES / "w1mer"
+    shutil.copytree(src, dst, dirs_exist_ok=True)
+    cfg_dst = Path(cwd) / CONFIG_NAME
+    if not cfg_dst.exists():
+        shutil.copy(TEMPLATES / CONFIG_NAME, cfg_dst)
+        print(f"created {CONFIG_NAME}")
+    print(f"scaffolded .w1mer/ from templates")
+
+
+def collect_files(tdef, cfg):
+    """Return dict {id: path} for all content files of a type (excluding INDEX)."""
+    root = Path.cwd() / cfg.get("planning_dir", ".w1mer")
+    d = root / tdef["dir"]
+    out = {}
+    if not d.exists():
+        return out
+    for p in sorted(d.glob("*.md")):
+        if p.name in ("INDEX.md", "CHANGES.md") or p.name.startswith("."):
+            continue
+        meta, _ = read_frontmatter(p)
+        if "id" in meta:
+            out[meta["id"]] = p
+    return out
+
+
+def slugify(title):
+    s = re.sub(r"[^A-Za-z0-9]+", "_", title).strip("_").lower()
+    return s or "untitled"
+
+
+def cmd_new(cwd, cfg, args):
+    tdef = get_type(cfg, args.type)
+    files = collect_files(tdef, cfg)
+    if args.type == "task":
+        add_roadmap_task(cwd, args)
+        return
+    existing = set(files) | set(tdef.get("static", []))
+    nid = next_id(tdef, parent=args.parent, domain=args.domain, existing=existing)
+    if nid in files:
+        sys.exit(f"error: id {nid} already exists")
+    meta = {"id": nid, "title": args.title or f"{args.type} {nid}", "state": args.state}
+    if args.domain:
+        meta["domain"] = args.domain
+    # build file name
+    fname = tdef["file"].replace("{id}", nid).replace("{slug}", slugify(args.title or nid))
+    d = Path(cwd) / cfg.get("planning_dir", ".w1mer") / tdef["dir"]
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / fname
+    body = BODY_TEMPLATES.get(args.type, "# {id}\n\n").format(id=nid, state=args.state, title=meta["title"])
+    write_frontmatter(path, meta, body)
+    rel = path.resolve().relative_to(Path(cwd).resolve())
+    print(f"created {rel}  (id={nid})")
+
+
+def add_roadmap_task(cwd, args):
+    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    if not road.exists():
+        sys.exit("error: .w1mer/ROADMAP.md missing (run 'w1mer init')")
+    text = road.read_text(encoding="utf-8")
+    ids = task_existing_ids(text)
+    if args.parent:
+        parent = str(args.parent)
+        children = [i for i in ids if i.startswith(f"{parent}.")]
+        n = 1
+        for c in children:
+            m = re.match(rf"^{re.escape(parent)}\.(\d+)$", c)
+            if m:
+                n = max(n, int(m.group(1)) + 1)
+        nid = f"{parent}.{n}"
+    else:
+        nums = [int(i.split(".")[0]) for i in ids]
+        nid = f"{max(nums) + 1:02d}" if nums else "01"
+    if nid in ids:
+        sys.exit(f"error: task {nid} already exists")
+    title = args.title or f"task {nid}"
+    line = f"| {nid} | {title} | — | todo | |"
+    marker = "<!-- w1mer:task -->"
+    if marker not in text:
+        sys.exit("error: ROADMAP.md missing w1mer:task marker (re-run 'w1mer init')")
+    pos = text.index(marker) + len(marker)
+    lines = text[pos:].split("\n")
+    # skip leading blank lines after the marker
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    lines = lines[i:]
+    # collect contiguous task-row lines
+    region_end = 0
+    while region_end < len(lines) and re.match(r"^\| \d", lines[region_end]):
+        region_end += 1
+    task_rows = lines[:region_end]
+    tail = lines[region_end:]
+    if nid in ids:
+        sys.exit(f"error: task {nid} already exists")
+    task_rows.append(line)
+    # pre-order sort: (1,) < (1,1) < (1,1,1) < (1,2) < (2,)
+    task_rows.sort(key=lambda r: tuple(int(p) for p in re.findall(r"\d+", r)))
+    block = "\n".join(task_rows) + "\n\n" + "\n".join(tail).rstrip() + "\n"
+    text = text[:pos] + "\n" + block
+    road.write_text(text, encoding="utf-8")
+    print(f"added task {nid}: {title}")
+
+
+def find_file(tdef, cfg, nid):
+    files = collect_files(tdef, cfg)
+    if nid in files:
+        return files[nid]
+    sys.exit(f"error: {nid} not found")
+
+
+def cmd_set(cwd, cfg, args):
+    tdef = get_type(cfg, args.type)
+    path = find_file(tdef, cfg, args.id)
+    states = tdef.get("states", [])
+    if states and args.state not in states:
+        sys.exit(f"error: state '{args.state}' not in {states}")
+    meta, body = read_frontmatter(path)
+    meta["state"] = args.state
+    write_frontmatter(path, meta, body)
+    rel = path.resolve().relative_to(Path(cwd).resolve())
+    print(f"{rel}: state -> {args.state}")
+
+
+def preorder_sort(ids):
+    def key(i):
+        s = str(i)
+        prefix = re.split(r"\d", s, 1)[0]          # leading non-digit prefix
+        nums = tuple(int(m) for m in re.findall(r"\d+", s))
+        return (prefix, nums, s)
+
+    return sorted(ids, key=key)
+
+
+def cmd_list(cwd, cfg, args):
+    if args.type:
+        types = {args.type: get_type(cfg, args.type)}
+    else:
+        types = cfg.get("types", {})
+    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    for tname, tdef in types.items():
+        files = collect_files(tdef, cfg)
+        if not files:
+            continue
+        print(f"\n[{tname}]")
+        for nid in preorder_sort(files):
+            meta, _ = read_frontmatter(files[nid])
+            print(f"  {nid:<8} {meta.get('state','?'):<14} {meta.get('title','')}")
+
+
+def cmd_build(cwd, cfg):
+    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    for tname, tdef in cfg.get("types", {}).items():
+        d = root / tdef["dir"]
+        idx = d / "INDEX.md"
+        if not idx.exists():
+            continue
+        files = collect_files(tdef, cfg)
+        rows = []
+        cols = tdef.get("index", ["id", "title", "state", "doc"])
+        for nid in preorder_sort(files):
+            meta, _ = read_frontmatter(files[nid])
+            vals = []
+            for c in cols:
+                if c == "doc":
+                    vals.append(f"[{files[nid].name}]({files[nid].name})")
+                else:
+                    vals.append(meta.get(c, ""))
+            rows.append("| " + " | ".join(vals) + " |")
+        text = idx.read_text(encoding="utf-8")
+        if "<!-- w1mer:rows -->" not in text:
+            continue
+        start = text.index("<!-- w1mer:rows -->") + len("<!-- w1mer:rows -->")
+        end = text.index("<!-- /w1mer:rows -->")
+        text = text[:start] + "\n" + "\n".join(rows) + "\n" + text[end:]
+        idx.write_text(text, encoding="utf-8")
+        rel = idx.resolve().relative_to(Path(cwd).resolve())
+        print(f"built {rel}  ({len(rows)} rows)")
+
+
+# ---------------------------------------------------------------------------
+
+def main():
+    p = argparse.ArgumentParser(prog="w1mer", description="metadata-driven archive CLI")
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    p_init = sub.add_parser("init", help="scaffold .w1mer/ from templates")
+
+    p_new = sub.add_parser("new", help="create an entry")
+    p_new.add_argument("type")
+    p_new.add_argument("--parent", default=None, help="derive child id from parent (e.g. 05 -> 05.1)")
+    p_new.add_argument("--title", default=None)
+    p_new.add_argument("--domain", default=None, help="perf domain")
+    p_new.add_argument("--state", default="todo", help="initial state")
+
+    p_set = sub.add_parser("set", help="update an entry's state")
+    p_set.add_argument("type")
+    p_set.add_argument("id")
+    p_set.add_argument("--state", required=True)
+
+    p_list = sub.add_parser("list", help="list entries")
+    p_list.add_argument("--type", default=None)
+
+    sub.add_parser("build", help="regenerate INDEX files")
+
+    args = p.parse_args()
+    if args.cmd == "init":
+        cmd_init(Path.cwd())
+        return
+    cfg = load_config(Path.cwd())
+    if args.cmd == "new":
+        cmd_new(Path.cwd(), cfg, args)
+    elif args.cmd == "set":
+        cmd_set(Path.cwd(), cfg, args)
+    elif args.cmd == "list":
+        cmd_list(Path.cwd(), cfg, args)
+    elif args.cmd == "build":
+        cmd_build(Path.cwd(), cfg)
+
+
+if __name__ == "__main__":
+    main()
