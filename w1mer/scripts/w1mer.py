@@ -182,7 +182,8 @@ def collect_files(tdef, cfg):
 
 
 def slugify(title):
-    s = re.sub(r"[^A-Za-z0-9]+", "_", title).strip("_").lower()
+    # \w keeps unicode letters (incl. CJK) so Chinese titles survive
+    s = re.sub(r"[^\w]+", "_", title).strip("_").lower()
     return s or "untitled"
 
 
@@ -192,19 +193,24 @@ def cmd_new(cwd, cfg, args):
     if args.type == "task":
         add_roadmap_task(cwd, args)
         return
+    states = tdef.get("states", [])
+    state = args.state or (states[0] if states else "todo")
+    if states and state not in states:
+        sys.exit(f"error: state '{state}' not in {states}")
     existing = set(files) | set(tdef.get("static", []))
     nid = next_id(tdef, parent=args.parent, domain=args.domain, existing=existing)
     if nid in files:
         sys.exit(f"error: id {nid} already exists")
-    meta = {"id": nid, "title": args.title or f"{args.type} {nid}", "state": args.state}
+    meta = {"id": nid, "title": args.title or f"{args.type} {nid}", "state": state}
     if args.domain:
         meta["domain"] = args.domain
     # build file name
-    fname = tdef["file"].replace("{id}", nid).replace("{slug}", slugify(args.title or nid))
+    slug = args.slug or slugify(args.title or nid)
+    fname = tdef["file"].replace("{id}", nid).replace("{slug}", slug)
     d = Path(cwd) / cfg.get("planning_dir", ".w1mer") / tdef["dir"]
     d.mkdir(parents=True, exist_ok=True)
     path = d / fname
-    body = BODY_TEMPLATES.get(args.type, "# {id}\n\n").format(id=nid, state=args.state, title=meta["title"])
+    body = BODY_TEMPLATES.get(args.type, "# {id}\n\n").format(id=nid, state=state, title=meta["title"])
     write_frontmatter(path, meta, body)
     rel = path.resolve().relative_to(Path(cwd).resolve())
     print(f"created {rel}  (id={nid})")
@@ -230,11 +236,13 @@ def add_roadmap_task(cwd, args):
         nid = f"{max(nums) + 1:02d}" if nums else "01"
     if nid in ids:
         sys.exit(f"error: task {nid} already exists")
-    title = args.title or f"task {nid}"
-    line = f"| {nid} | {title} | — | todo | |"
-    marker = "<!-- w1mer:task -->"
+    section = args.section or "perf"
+    marker = f"<!-- w1mer:task:{section} -->"
     if marker not in text:
-        sys.exit("error: ROADMAP.md missing w1mer:task marker (re-run 'w1mer init')")
+        sys.exit(f"error: ROADMAP.md missing marker {marker} (sections: perf/bug/feature/infra/backlog)")
+    title = args.title or f"task {nid}"
+    doc = args.doc or "—"
+    line = f"| {nid} | {title} | {doc} | todo | |"
     pos = text.index(marker) + len(marker)
     lines = text[pos:].split("\n")
     # skip leading blank lines after the marker
@@ -248,15 +256,19 @@ def add_roadmap_task(cwd, args):
         region_end += 1
     task_rows = lines[:region_end]
     tail = lines[region_end:]
-    if nid in ids:
-        sys.exit(f"error: task {nid} already exists")
     task_rows.append(line)
-    # pre-order sort: (1,) < (1,1) < (1,1,1) < (1,2) < (2,)
-    task_rows.sort(key=lambda r: tuple(int(p) for p in re.findall(r"\d+", r)))
+    # pre-order sort by ID column only: (1,) < (1,1) < (1,1,1) < (1,2) < (2,)
+    task_rows.sort(key=task_row_key)
     block = "\n".join(task_rows) + "\n\n" + "\n".join(tail).rstrip() + "\n"
     text = text[:pos] + "\n" + block
     road.write_text(text, encoding="utf-8")
-    print(f"added task {nid}: {title}")
+    print(f"added task {nid}: {title}  [{section}]")
+
+
+def task_row_key(row):
+    """Sort key from the task row's ID column only — never doc/effect numbers."""
+    m = re.match(r"^\| (\d+(?:\.\d+)*) ", row)
+    return tuple(int(p) for p in m.group(1).split(".")) if m else (0,)
 
 
 def find_file(tdef, cfg, nid):
@@ -316,9 +328,17 @@ def set_roadmap_task(cwd, args):
     print(f"task {args.id}: state={cells[2]} effect={cells[3]}")
 
 
-def preorder_sort(ids):
+def preorder_sort(ids, domain_order=None):
     def key(i):
         s = str(i)
+        if domain_order:
+            m = re.match(r"^(?:PERF_)?(\w+?)(?:_\d+)?$", s)
+            # PERF_string_01 → domain "string", seq 01
+            dm = re.match(r"PERF_(\w+)_(\d+)$", s)
+            if dm:
+                dom, seq = dm.group(1), int(dm.group(2))
+                dom_idx = domain_order.index(dom) if dom in domain_order else len(domain_order)
+                return (dom_idx, seq)
         prefix = re.split(r"\d", s, 1)[0]          # leading non-digit prefix
         nums = tuple(int(m) for m in re.findall(r"\d+", s))
         return (prefix, nums, s)
@@ -340,7 +360,7 @@ def cmd_list(cwd, cfg, args):
         if not files:
             continue
         print(f"\n[{tname}]")
-        for nid in preorder_sort(files):
+        for nid in preorder_sort(files, tdef.get("domains")):
             meta, _ = read_frontmatter(files[nid])
             print(f"  {nid:<8} {meta.get('state','?'):<14} {meta.get('title','')}")
 
@@ -370,7 +390,7 @@ def cmd_build(cwd, cfg):
         files = collect_files(tdef, cfg)
         rows = []
         cols = tdef.get("index", ["id", "title", "state", "doc"])
-        for nid in preorder_sort(files):
+        for nid in preorder_sort(files, tdef.get("domains")):
             meta, _ = read_frontmatter(files[nid])
             vals = []
             for c in cols:
@@ -467,8 +487,11 @@ def main():
     p_new.add_argument("type")
     p_new.add_argument("--parent", default=None, help="derive child id from parent (e.g. 05 -> 05.1)")
     p_new.add_argument("--title", default=None)
+    p_new.add_argument("--doc", default=None, help="doc column (task rows)")
+    p_new.add_argument("--slug", default=None, help="file slug (overrides auto from title)")
     p_new.add_argument("--domain", default=None, help="perf domain")
-    p_new.add_argument("--state", default="todo", help="initial state")
+    p_new.add_argument("--state", default=None, help="initial state (default: type's first state)")
+    p_new.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog")
 
     p_set = sub.add_parser("set", help="update an entry's state (task also accepts --effect)")
     p_set.add_argument("type")

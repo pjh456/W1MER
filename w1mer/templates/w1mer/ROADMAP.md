@@ -20,23 +20,27 @@
 
 | # | Task | Doc | Status | Effect |
 |---|------|-----|--------|--------|
-<!-- w1mer:task -->
+<!-- w1mer:task:perf -->
 
 ## 二、Bug fixes
 
 | # | Task | Doc | Status | Effect |
 |---|------|-----|--------|--------|
+<!-- w1mer:task:bug -->
 
 ## 三、Features
 
 | # | Task | Doc | Status | Effect |
 |---|------|-----|--------|--------|
+<!-- w1mer:task:feature -->
 
 ## 四、Infrastructure
 
 | # | Task | Doc | Status | Effect |
 |---|------|-----|--------|--------|
+<!-- w1mer:task:infra -->
 
 ## 五、Backlog
 
 (Items awaiting re-prioritization)
+<!-- w1mer:task:backlog -->

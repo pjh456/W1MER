@@ -12,7 +12,10 @@ indexes.
 
 ```sh
 w1mer init                       # scaffold the planning directory from templates
-w1mer new <type> [--parent <id>] [--title "..."] [--slug <text>]
+w1mer new <type> [--parent <id>] [--title "..."] [--doc "..." (task)]
+                                  [--slug <text>] [--domain <d> (perf)]
+                                  [--section perf|bug|feature|infra|backlog (task)]
+                                  [--state <s>]   # default: type's first state
 w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
 w1mer list [--type <type>] [--sort tree]
 w1mer build                      # regenerate all INDEX files

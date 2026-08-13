@@ -28,10 +28,11 @@ types:
 
   perf:
     dir: "performance"
-    id: "PERF_{domain}_{seq:02}"   # domain: gc|property|array|coercion|string|call|ic_dispatch|compile
+    id: "PERF_{domain}_{seq:02}"   # domain from --domain
     file: "{id}.md"
     index: [id, title, domain, state, doc]
     states: [pending, reviewing, optimizing, retesting, done, shelved]
+    domains: [gc, property, array, coercion, string, call, ic_dispatch, compile]  # semantic order
 
   detail:
     dir: "detail"
