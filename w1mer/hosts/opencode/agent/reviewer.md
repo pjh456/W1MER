@@ -1,7 +1,6 @@
 ---
 description: W1MER reviewer — re-reviews the task completed last batch (git-committed code), read-only. Records review doc + architecture-impact note.
 mode: subagent
-model: small
 permission:
   edit: deny
   write: deny

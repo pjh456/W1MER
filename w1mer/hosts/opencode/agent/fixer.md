@@ -1,7 +1,6 @@
 ---
 description: W1MER fixer — sub-batch only; fixes issues listed in a review doc or finishes half-done work. Writes and commits.
 mode: subagent
-model: large
 permission:
   edit: allow
   bash:

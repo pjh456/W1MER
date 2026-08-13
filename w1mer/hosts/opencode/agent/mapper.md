@@ -1,7 +1,6 @@
 ---
 description: W1MER codebase mapper — explores the codebase for one focus area (tech|arch|conv), writes the stable-layer doc(s) directly to .w1mer/codebase/. Read-only vs code.
 mode: subagent
-model: small
 permission:
   edit: deny
   write: deny

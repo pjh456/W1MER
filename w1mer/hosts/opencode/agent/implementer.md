@@ -1,7 +1,6 @@
 ---
 description: W1MER implementer — completes the current task; the only writer (compile exclusivity). Builds, self-tests, commits atomically.
 mode: subagent
-model: large
 permission:
   edit: allow
   bash:
