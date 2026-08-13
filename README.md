@@ -143,14 +143,14 @@ W1MER/
 ├── README.md           # this file (English)
 ├── docs/               # paradigm & operating specs
 │   └── README-zh.md    # Chinese README
-├── w1mer/              # the skill package (copy to your skills dir to install)
-│   ├── SKILL.md        #   skill entry (Anthropic Agent Skills format)
-│   ├── references/     #   roles / scheduling / archive / codebase specs
-│   ├── templates/      #   .w1mer/ scaffold + w1mer.yaml registry
-│   └── scripts/        #   w1mer.py CLI (init/new/set/list/build)
-└── hosts/              # host-specific agent definitions
-    ├── opencode/       #   .opencode/agent/*.md
-    └── claude-code/    #   .claude/agents/*.md
+└── w1mer/              # the skill package (self-contained; install whole dir)
+    ├── SKILL.md        #   skill entry (Anthropic Agent Skills format)
+    ├── references/     #   roles / scheduling / archive / codebase specs
+    ├── templates/      #   .w1mer/ scaffold + w1mer.yaml registry
+    ├── scripts/        #   w1mer.py CLI (init/new/set/list/build/sync)
+    └── hosts/          #   host-specific agent definitions
+        ├── opencode/   #     .opencode/agent/*.md (copy to ~/.config/opencode/agents/)
+        └── claude-code/    #   .claude/agents/*.md
 ```
 
 ## Status

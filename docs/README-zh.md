@@ -97,14 +97,14 @@ W1MER/
 ├── README.md           # 本文件（英文版）
 ├── docs/               # 范式与操作规范
 │   └── README-zh.md    # 中文版 README
-├── w1mer/              # skill 包（复制到 skills 目录即可安装）
-│   ├── SKILL.md        #   skill 入口（Anthropic Agent Skills 格式）
-│   ├── references/     #   角色 / 调度 / 归档 / codebase 规范
-│   ├── templates/      #   .w1mer/ 脚手架 + w1mer.yaml 注册表
-│   └── scripts/        #   w1mer.py CLI（init/new/set/list/build）
-└── hosts/              # 宿主特定的 agent 定义
-    ├── opencode/       #   .opencode/agent/*.md
-    └── claude-code/    #   .claude/agents/*.md
+└── w1mer/              # skill 包（自包含；整体复制即可安装）
+    ├── SKILL.md        #   skill 入口（Anthropic Agent Skills 格式）
+    ├── references/     #   角色 / 调度 / 归档 / codebase 规范
+    ├── templates/      #   .w1mer/ 脚手架 + w1mer.yaml 注册表
+    ├── scripts/        #   w1mer.py CLI（init/new/set/list/build/sync）
+    └── hosts/          #   宿主特定的 agent 定义
+        ├── opencode/   #     .opencode/agent/*.md（复制到 ~/.config/opencode/agents/）
+        └── claude-code/    #   .claude/agents/*.md
 ```
 
 ## 状态

@@ -132,3 +132,6 @@ orchestration, then as needed:
 - `references/map-codebase.md` — parallel stable-layer mapping.
 
 Host-specific agent definitions live in `hosts/` (opencode, claude-code).
+Install them into your host's agent directory alongside this skill, e.g. for
+opencode: copy `hosts/opencode/agent/*.md` → `~/.config/opencode/agents/`.
+The `w1mer` CLI entry is `scripts/w1mer.py`.
