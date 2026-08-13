@@ -7,7 +7,8 @@ description: >-
   (reviewer + implementer + explorer), single-writer compile exclusivity,
   sub-batch fixer loops, rolling hierarchical task IDs, and a metadata-driven
   document archive CLI. Triggers: "w1mer", "main batch", "single writer",
-  "multi-agent scheduling", "orchestrate agents", "compile exclusivity".
+  "multi-agent scheduling", "orchestrate agents", "compile exclusivity",
+  "map codebase", "parallel mappers".
 ---
 
 # W1MER — Only one Writer, Many Explorers Read
@@ -103,6 +104,21 @@ Writes are throttled: the Reviewer records a short architecture-impact note in
 its review doc; a periodic **compact** merges deltas into the stable docs and
 clears the changelog.
 
+## Map codebase
+
+Initialize or refresh the stable layer (`.w1mer/codebase/`) with **3 parallel
+read-only mappers**, one per focus area:
+
+```
+mapper-tech  → STACK.md, INTEGRATIONS.md
+mapper-arch  → ARCHITECTURE.md, STRUCTURE.md
+mapper-conv  → CONVENTIONS.md
+```
+
+Mappers write documents directly and return confirmations only. Run after
+`w1mer init` and after major refactors. Full spec in
+`references/map-codebase.md`.
+
 ## Details
 
 Full operating specs live in `references/` — read them before your first
@@ -112,5 +128,6 @@ orchestration, then as needed:
 - `references/scheduling.md` — batch lifecycle, interrupt recovery, context.
 - `references/archive.md` — CLI reference, type registry, ID rules.
 - `references/codebase.md` — layered docs, compact flow, cache strategy.
+- `references/map-codebase.md` — parallel stable-layer mapping.
 
 Host-specific agent definitions live in `hosts/` (opencode, claude-code).
