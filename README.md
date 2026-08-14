@@ -139,6 +139,23 @@ Architecture docs are updated periodically: increments are merged into the
 stable documents and the changelog is cleared. This reduces cache misses and
 extra output, keeping the bill friendly.
 
+## Install
+
+The skill package is self-contained — install it into your host's skill
+directory (e.g. `npx skills add <owner>/w1mer -a opencode -g`, or copy the
+`w1mer/` directory), then register the host agents and the CLI:
+
+```sh
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|all]
+                                            [--link] [--bin-dir <dir>]
+```
+
+`install` copies each host's agent definitions into its agent directory
+(opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`)
+and puts a `w1mer` launcher on PATH (symlink the skill script with `--link`).
+`install --list` shows the target locations without changing anything. On
+Windows the launcher is a `.bat` that forwards to the skill script.
+
 ## Project layout
 
 ```
@@ -150,9 +167,9 @@ W1MER/
     ├── SKILL.md        #   skill entry (Anthropic Agent Skills format)
     ├── references/     #   roles / scheduling / archive / codebase specs
     ├── templates/      #   .w1mer/ scaffold + w1mer.yaml registry
-    ├── scripts/        #   w1mer.py CLI (init/new/set/list/build/sync)
+    ├── scripts/        #   w1mer.py CLI (init/install/new/set/list/build/sync)
     └── hosts/          #   host-specific agent definitions
-        ├── opencode/   #     .opencode/agent/*.md (copy to ~/.config/opencode/agents/)
+        ├── opencode/   #     .opencode/agent/*.md (install → ~/.config/opencode/agents/)
         └── claude-code/    #   .claude/agents/*.md
 ```
 

@@ -93,6 +93,17 @@ W1MER 的 codebase 文档分两层：
 
 架构文档的更新定期进行，把增量合并进稳定文档并清空变更日志。减少了缓存失配和额外输出的次数，保持了账单友好。
 
+## 安装
+
+skill 包是自包含的——安装到宿主机的 skill 目录（如 `npx skills add <owner>/w1mer -a opencode -g`，或直接复制 `w1mer/` 目录），然后注册 host agents 与 CLI：
+
+```sh
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|all]
+                                            [--link] [--bin-dir <dir>]
+```
+
+`install` 会把各 host 的 agent 定义复制到对应 agent 目录（opencode → `~/.config/opencode/agents/`，claude-code → `~/.claude/agents/`），并在 PATH 上安装 `w1mer` 启动器（`--link` 改为 symlink 指向 skill 脚本）。`install --list` 只显示目标位置、不改动任何东西。Windows 上启动器为转发到 skill 脚本的 `.bat`。
+
 ## 项目布局
 
 ```
@@ -104,9 +115,9 @@ W1MER/
     ├── SKILL.md        #   skill 入口（Anthropic Agent Skills 格式）
     ├── references/     #   角色 / 调度 / 归档 / codebase 规范
     ├── templates/      #   .w1mer/ 脚手架 + w1mer.yaml 注册表
-    ├── scripts/        #   w1mer.py CLI（init/new/set/list/build/sync）
+    ├── scripts/        #   w1mer.py CLI（init/install/new/set/list/build/sync）
     └── hosts/          #   宿主特定的 agent 定义
-        ├── opencode/   #     .opencode/agent/*.md（复制到 ~/.config/opencode/agents/）
+        ├── opencode/   #     .opencode/agent/*.md（install → ~/.config/opencode/agents/）
         └── claude-code/    #   .claude/agents/*.md
 ```
 

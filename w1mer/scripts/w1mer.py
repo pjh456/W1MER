@@ -182,9 +182,9 @@ def cmd_init(cwd):
 
 
 def pick_bin_dir():
-    """First writable dir on PATH, preferring ~/.local/bin (already on PATH)."""
+    """First writable dir on PATH, preferring ~/.local/bin (POSIX only)."""
     home_local = Path.home() / ".local" / "bin"
-    if home_local in [Path(p) for p in os.environ.get("PATH", "").split(os.pathsep) if p]:
+    if os.name != "nt" and home_local in [Path(p) for p in os.environ.get("PATH", "").split(os.pathsep) if p]:
         return home_local
     for p in os.environ.get("PATH", "").split(os.pathsep):
         d = Path(p)
@@ -194,9 +194,11 @@ def pick_bin_dir():
 
 
 def install_cli(bin_dir, link=False):
-    dst = bin_dir / "w1mer"
+    is_windows = os.name == "nt"
+    name = "w1mer.bat" if is_windows else "w1mer"
+    dst = bin_dir / name
     src = SKILL_ROOT / "scripts" / "w1mer.py"
-    if link:
+    if link and not is_windows:
         src.chmod(src.stat().st_mode | stat.S_IEXEC)
         try:
             dst.unlink(missing_ok=True)
@@ -205,16 +207,24 @@ def install_cli(bin_dir, link=False):
             return True
         except OSError as e:
             print(f"warning: symlink failed ({e}); falling back to launcher")
-    launcher = (
-        "#!/bin/sh\n"
-        f"exec python3 {shlex.quote(str(src))} \"$@\"\n"
-    )
+    if is_windows:
+        launcher = (
+            "@echo off\r\n"
+            f'python "{src}" %*\r\n'
+            "exit /b %ERRORLEVEL%\r\n"
+        )
+    else:
+        launcher = (
+            "#!/bin/sh\n"
+            f"exec python3 {shlex.quote(str(src))} \"$@\"\n"
+        )
     try:
         dst.unlink(missing_ok=True)
     except OSError:
         pass
     dst.write_text(launcher, encoding="utf-8")
-    dst.chmod(dst.stat().st_mode | stat.S_IEXEC)
+    if not is_windows:
+        dst.chmod(dst.stat().st_mode | stat.S_IEXEC)
     print(f"installed launcher -> {dst}")
     return True
 
