@@ -79,8 +79,11 @@ An agent that exits abnormally or returns empty is treated as an *unfinished
 stage*, recovered per role:
 
 1. Explorer / Reviewer: relaunch
-2. Implementer / Fixer: dispatch a Fixer agent to finish the half-done work,
-   taking on the Implementer's reporting duty
+2. Implementer: check the working tree first
+   - Clean (no half-done work): relaunch the Implementer to redo the task
+   - Dirty: dispatch a Fixer agent to finish the half-done work, taking on
+     the Implementer's reporting duty
+3. Fixer: dispatch a Fixer to resume the repair
 
 ### Rolling hierarchical IDs
 

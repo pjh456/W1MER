@@ -59,7 +59,13 @@ An agent that exits abnormally / returns empty is an *unfinished stage*:
 | Role | Recovery |
 |------|----------|
 | Explorer / Reviewer | relaunch |
-| Implementer / Fixer | dispatch a Fixer to finish the half-done work (takes over the implementer's reporting duty) |
+| Implementer, working tree clean | relaunch the Implementer — nothing half-done to finish |
+| Implementer, working tree dirty | dispatch a Fixer to finish the half-done work (takes over the implementer's reporting duty) |
+| Fixer | dispatch a Fixer to resume the repair |
+
+On main-batch recovery, check the working tree (`git status`) first: clean →
+relaunch the Implementer (no half-done work to fix); dirty → dispatch a Fixer
+to finish the half-done work. Use a Fixer whenever a repair is the right job.
 
 ## Pre-existing problems
 

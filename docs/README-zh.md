@@ -55,7 +55,10 @@ Explorer（探索者）：调查下一任务（只读，写方案）
 异常退出 / 空回报的 Agent 视为*阶段未完成*，按不同的角色进行恢复：
 
 1. Explorer/Reviewer：重新启动
-2. Implementer/Fixer：派一个 Fixer Agent 去修写一半的内容，同时承担 Implementer 的汇报职责
+2. Implementer：先看工作区
+   - 干净（没有做一半的工作）：重新启动 Implementer 重做该任务
+   - 脏（存在做一半的工作）：派一个 Fixer Agent 去修写一半的内容，同时承担 Implementer 的汇报职责
+3. Fixer：派一个 Fixer 继续修复
 
 ### 滚动层级编号
 

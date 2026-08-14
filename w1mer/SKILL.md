@@ -62,7 +62,10 @@ Explorer     investigates the next task               (read-only)
 *unfinished stage*:
 
 - Explorer / Reviewer → relaunch.
-- Implementer / Fixer → dispatch a Fixer to finish the half-done work.
+- Implementer, working tree clean (`git status` shows no half-done work) →
+  relaunch the Implementer to redo the task.
+- Implementer, working tree dirty / Fixer → dispatch a Fixer to finish the
+  half-done work (a repair job stays a Fixer's job).
 
 ## Task IDs
 

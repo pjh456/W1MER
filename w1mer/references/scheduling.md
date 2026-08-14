@@ -45,7 +45,15 @@ stage* and recovered by role:
 | Role | Recovery |
 |------|----------|
 | Explorer / Reviewer | relaunch |
-| Implementer / Fixer | dispatch a Fixer to finish the half-done work, taking over the implementer's reporting duty |
+| Implementer, working tree clean | relaunch the Implementer — nothing half-done to finish |
+| Implementer, working tree dirty | dispatch a Fixer to finish the half-done work, taking over the implementer's reporting duty |
+| Fixer | dispatch a Fixer to resume the repair — the pending repair duty is still a Fixer's job |
+
+On main-batch recovery, first check the working tree (`git status`): clean
+means the interrupted Implementer left no half-done work, so a fresh
+Implementer simply redoes the task; dirty means half-done work exists, so a
+Fixer finishes it. When a Fixer is the right tool (dirty tree, or a sub-batch
+repair), keep using a Fixer.
 
 ## Context discipline
 
