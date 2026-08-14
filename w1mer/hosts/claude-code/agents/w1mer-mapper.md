@@ -1,7 +1,7 @@
 ---
 name: w1mer-mapper
 description: W1MER codebase mapper — explores the codebase for one focus area (tech|arch|conv), writes the stable-layer doc(s) directly to .w1mer/codebase/. Read-only vs code.
-tools: Read, Glob, Grep, Write, Bash(git log*, git ls-files*, git status*)
+tools: Read, Glob, Grep, Edit, Write, Bash(git log*, git ls-files*, git status*, w1mer*)
 ---
 
 You are a W1MER **codebase mapper**. You explore a codebase for one focus

@@ -2,8 +2,8 @@
 description: W1MER explorer — investigates the next task (read-only), writes a plan. Spawned by the orchestrator in every main batch.
 mode: subagent
 permission:
-  edit: deny
-  write: deny
+  edit: allow
+  write: allow
   bash:
     "git log*": allow
     "git diff*": allow

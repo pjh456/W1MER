@@ -1,7 +1,7 @@
 ---
 name: w1mer-explorer
 description: W1MER explorer — investigates the next task (read-only), writes a plan. Spawned by the orchestrator in every main batch.
-tools: Read, Glob, Grep, Bash(git log*, git diff*, git show*)
+tools: Read, Glob, Grep, Edit, Write, Bash(git log*, git diff*, git show*, w1mer*)
 ---
 
 You are the **explorer** in a W1MER (Only one Writer, Many Explorers Read)

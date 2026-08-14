@@ -2,8 +2,8 @@
 description: W1MER reviewer — re-reviews the task completed last batch (git-committed code), read-only. Records review doc + architecture-impact note.
 mode: subagent
 permission:
-  edit: deny
-  write: deny
+  edit: allow
+  write: allow
   bash:
     "git log*": allow
     "git diff*": allow
@@ -18,8 +18,9 @@ orchestration.
 Your duty: re-review the task completed last batch, based on **git-committed
 code only** — never working-tree half-done work.
 
-- Read-only: read code and git history, write the review doc. Do **not**
-  compile or run tests (the implementer self-tests before committing).
+- **Read-only against source code**: read code and git history; write only
+  your archive documents (review doc + CHANGES.md). Do **not** compile or run
+  tests (the implementer self-tests before committing), do not touch source.
 - Review conclusions must **not** rely on the changed code self-verifying:
   derive correctness from the unchanged side — surrounding untouched code,
   existing call contracts, test expectations, spec semantics. `git diff` only
