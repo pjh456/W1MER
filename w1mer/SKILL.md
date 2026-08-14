@@ -134,7 +134,16 @@ orchestration, then as needed:
 - `references/codebase.md` — layered docs, compact flow, cache strategy.
 - `references/map-codebase.md` — parallel stable-layer mapping.
 
-Host-specific agent definitions live in `hosts/` (opencode, claude-code).
-Install them into your host's agent directory alongside this skill, e.g. for
-opencode: copy `hosts/opencode/agent/*.md` → `~/.config/opencode/agents/`.
-The `w1mer` CLI entry is `scripts/w1mer.py`.
+Host-specific agent definitions live in `hosts/` (opencode, claude-code),
+shipped inside the skill. Install the skill (e.g. `npx skills add <owner>/w1mer
+-a opencode -g` or copy this directory), then register host agents and the CLI:
+
+```sh
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|all]
+                                            [--link] [--bin-dir <dir>]
+```
+
+`install` copies each host's agent definitions to its agent directory
+(opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`)
+and puts a `w1mer` launcher on PATH (symlink the skill script with `--link`).
+`install --list` prints the target locations without changing anything.

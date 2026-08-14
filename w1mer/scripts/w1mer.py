@@ -7,6 +7,7 @@ files are build artifacts (single-direction sync).
 
 Commands:
   init                    scaffold .w1mer/ from templates + copy w1mer.yaml
+  install                 install host agents + CLI launcher (--host, --link)
   new <type> [args]       create an entry (auto-increments the id)
   set <type> <id> --state <state>   update an entry's state
   list [--type <type>]    list entries (tree order for ids)
@@ -15,13 +16,28 @@ Commands:
 
 import argparse
 import datetime
+import os
 import re
+import shlex
 import shutil
+import stat
 import sys
 from pathlib import Path
 
-TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+SKILL_ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = SKILL_ROOT / "templates"
 CONFIG_NAME = "w1mer.yaml"
+
+HOSTS = {
+    "opencode": {
+        "agents": SKILL_ROOT / "hosts" / "opencode" / "agent",
+        "dest": Path.home() / ".config" / "opencode" / "agents",
+    },
+    "claude-code": {
+        "agents": SKILL_ROOT / "hosts" / "claude-code" / "agents",
+        "dest": Path.home() / ".claude" / "agents",
+    },
+}
 
 # ---------------------------------------------------------------------------
 # minimal YAML subset (key: value, nested 2-space blocks, dash lists, # comments)
@@ -163,6 +179,77 @@ def cmd_init(cwd):
         shutil.copy(TEMPLATES / CONFIG_NAME, cfg_dst)
         print(f"created {CONFIG_NAME}")
     print(f"scaffolded .w1mer/ from templates")
+
+
+def pick_bin_dir():
+    """First writable dir on PATH, preferring ~/.local/bin (already on PATH)."""
+    home_local = Path.home() / ".local" / "bin"
+    if home_local in [Path(p) for p in os.environ.get("PATH", "").split(os.pathsep) if p]:
+        return home_local
+    for p in os.environ.get("PATH", "").split(os.pathsep):
+        d = Path(p)
+        if d.is_dir() and os.access(d, os.W_OK):
+            return d
+    return None
+
+
+def install_cli(bin_dir, link=False):
+    dst = bin_dir / "w1mer"
+    src = SKILL_ROOT / "scripts" / "w1mer.py"
+    if link:
+        src.chmod(src.stat().st_mode | stat.S_IEXEC)
+        try:
+            dst.unlink(missing_ok=True)
+            dst.symlink_to(src)
+            print(f"linked CLI -> {dst}")
+            return True
+        except OSError as e:
+            print(f"warning: symlink failed ({e}); falling back to launcher")
+    launcher = (
+        "#!/bin/sh\n"
+        f"exec python3 {shlex.quote(str(src))} \"$@\"\n"
+    )
+    try:
+        dst.unlink(missing_ok=True)
+    except OSError:
+        pass
+    dst.write_text(launcher, encoding="utf-8")
+    dst.chmod(dst.stat().st_mode | stat.S_IEXEC)
+    print(f"installed launcher -> {dst}")
+    return True
+
+
+def cmd_install(args):
+    host = args.host
+    hosts = [host] if host != "all" else list(HOSTS)
+    for h in hosts:
+        if h not in HOSTS:
+            sys.exit(f"error: unknown host '{h}'. Known: {', '.join(HOSTS)} or 'all'")
+    if args.list_only:
+        for h in hosts:
+            spec = HOSTS[h]
+            print(f"[{h}] {spec['dest']} <- {spec['agents']}")
+        if not args.no_cli:
+            print(f"[cli] {pick_bin_dir() or 'NO WRITABLE PATH DIR'} <- {SKILL_ROOT / 'scripts' / 'w1mer.py'}")
+        return
+    for h in hosts:
+        spec = HOSTS[h]
+        src, dest = spec["agents"], spec["dest"]
+        if not src.is_dir():
+            print(f"warning: no agent definitions at {src}")
+            continue
+        dest.mkdir(parents=True, exist_ok=True)
+        n = 0
+        for f in sorted(src.glob("*.md")):
+            shutil.copy2(f, dest / f.name)
+            n += 1
+        print(f"installed {n} agent(s) -> {dest}")
+    if not args.no_cli:
+        bin_dir = Path(args.bin_dir) if args.bin_dir else pick_bin_dir()
+        if bin_dir is None:
+            print("warning: no writable directory on PATH; run with --bin-dir <dir>")
+        else:
+            install_cli(bin_dir, link=args.link)
 
 
 def collect_files(tdef, cfg):
@@ -483,6 +570,13 @@ def main():
 
     p_init = sub.add_parser("init", help="scaffold .w1mer/ from templates")
 
+    p_install = sub.add_parser("install", help="install host agents + CLI launcher")
+    p_install.add_argument("--host", default="opencode", help="opencode | claude-code | all (default: opencode)")
+    p_install.add_argument("--no-cli", action="store_true", help="skip installing the w1mer CLI launcher")
+    p_install.add_argument("--link", action="store_true", help="symlink the CLI to the skill instead of a launcher script")
+    p_install.add_argument("--bin-dir", default=None, help="directory to install the CLI launcher (default: first writable PATH dir)")
+    p_install.add_argument("--list", dest="list_only", action="store_true", help="show where things would install, do nothing")
+
     p_new = sub.add_parser("new", help="create an entry")
     p_new.add_argument("type")
     p_new.add_argument("--parent", default=None, help="derive child id from parent (e.g. 05 -> 05.1)")
@@ -510,6 +604,9 @@ def main():
     args = p.parse_args()
     if args.cmd == "init":
         cmd_init(Path.cwd())
+        return
+    if args.cmd == "install":
+        cmd_install(args)
         return
     cfg = load_config(Path.cwd())
     if args.cmd == "new":
