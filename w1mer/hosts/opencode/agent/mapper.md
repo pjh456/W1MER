@@ -8,6 +8,7 @@ permission:
     "git log*": allow
     "git ls-files*": allow
     "git status*": allow
+    "w1mer*": allow
     "*": deny
   todowrite: allow
 ---

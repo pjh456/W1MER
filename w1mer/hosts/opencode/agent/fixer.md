@@ -9,6 +9,7 @@ permission:
     "git status*": allow
     "git log*": allow
     "git diff*": allow
+    "w1mer*": allow
     "*": ask
   todowrite: allow
 ---
