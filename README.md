@@ -146,15 +146,17 @@ directory (e.g. `npx skills add <owner>/w1mer -a opencode -g`, or copy the
 `w1mer/` directory), then register the host agents and the CLI:
 
 ```sh
-python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|all]
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]
                                             [--link] [--bin-dir <dir>]
 ```
 
 `install` copies each host's agent definitions into its agent directory
-(opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`)
-and puts a `w1mer` launcher on PATH (symlink the skill script with `--link`).
-`install --list` shows the target locations without changing anything. On
-Windows the launcher is a `.bat` that forwards to the skill script.
+(opencode → `~/.config/opencode/agents/`, claude-code → `~/.claude/agents/`,
+codex → `~/.codex/agents/`) and puts a `w1mer` launcher on PATH (symlink the
+skill script with `--link`). `install --list` shows the target locations
+without changing anything. On Windows the launcher is a `.bat` that forwards
+to the skill script. Codex reads agents as TOML files and discovers the skill
+itself from `~/.agents/skills/` (USER scope) automatically.
 
 ## Project layout
 
@@ -170,7 +172,8 @@ W1MER/
     ├── scripts/        #   w1mer.py CLI (init/install/new/set/list/build/sync)
     └── hosts/          #   host-specific agent definitions
         ├── opencode/   #     .opencode/agent/*.md (install → ~/.config/opencode/agents/)
-        └── claude-code/    #   .claude/agents/*.md
+        ├── claude-code/    #   .claude/agents/*.md
+        └── codex/      #     .codex/agents/*.toml (install → ~/.codex/agents/)
 ```
 
 ## Status

@@ -98,11 +98,11 @@ W1MER 的 codebase 文档分两层：
 skill 包是自包含的——安装到宿主机的 skill 目录（如 `npx skills add <owner>/w1mer -a opencode -g`，或直接复制 `w1mer/` 目录），然后注册 host agents 与 CLI：
 
 ```sh
-python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|all]
+python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]
                                             [--link] [--bin-dir <dir>]
 ```
 
-`install` 会把各 host 的 agent 定义复制到对应 agent 目录（opencode → `~/.config/opencode/agents/`，claude-code → `~/.claude/agents/`），并在 PATH 上安装 `w1mer` 启动器（`--link` 改为 symlink 指向 skill 脚本）。`install --list` 只显示目标位置、不改动任何东西。Windows 上启动器为转发到 skill 脚本的 `.bat`。
+`install` 会把各 host 的 agent 定义复制到对应 agent 目录（opencode → `~/.config/opencode/agents/`，claude-code → `~/.claude/agents/`，codex → `~/.codex/agents/`），并在 PATH 上安装 `w1mer` 启动器（`--link` 改为 symlink 指向 skill 脚本）。`install --list` 只显示目标位置、不改动任何东西。Windows 上启动器为转发到 skill 脚本的 `.bat`。Codex 以 TOML 读取 agent，并会自动从 `~/.agents/skills/`（USER 作用域）发现 skill 本体。
 
 ## 项目布局
 
@@ -118,7 +118,8 @@ W1MER/
     ├── scripts/        #   w1mer.py CLI（init/install/new/set/list/build/sync）
     └── hosts/          #   宿主特定的 agent 定义
         ├── opencode/   #     .opencode/agent/*.md（install → ~/.config/opencode/agents/）
-        └── claude-code/    #   .claude/agents/*.md
+        ├── claude-code/    #   .claude/agents/*.md
+        └── codex/      #     .codex/agents/*.toml（install → ~/.codex/agents/）
 ```
 
 ## 状态

@@ -37,6 +37,10 @@ HOSTS = {
         "agents": SKILL_ROOT / "hosts" / "claude-code" / "agents",
         "dest": Path.home() / ".claude" / "agents",
     },
+    "codex": {
+        "agents": SKILL_ROOT / "hosts" / "codex" / "agents",
+        "dest": Path.home() / ".codex" / "agents",
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -250,7 +254,7 @@ def cmd_install(args):
             continue
         dest.mkdir(parents=True, exist_ok=True)
         n = 0
-        for f in sorted(src.glob("*.md")):
+        for f in sorted(list(src.glob("*.md")) + list(src.glob("*.toml"))):
             shutil.copy2(f, dest / f.name)
             n += 1
         print(f"installed {n} agent(s) -> {dest}")
@@ -581,7 +585,7 @@ def main():
     p_init = sub.add_parser("init", help="scaffold .w1mer/ from templates")
 
     p_install = sub.add_parser("install", help="install host agents + CLI launcher")
-    p_install.add_argument("--host", default="opencode", help="opencode | claude-code | all (default: opencode)")
+    p_install.add_argument("--host", default="opencode", help="opencode | claude-code | codex | all (default: opencode)")
     p_install.add_argument("--no-cli", action="store_true", help="skip installing the w1mer CLI launcher")
     p_install.add_argument("--link", action="store_true", help="symlink the CLI to the skill instead of a launcher script")
     p_install.add_argument("--bin-dir", default=None, help="directory to install the CLI launcher (default: first writable PATH dir)")
