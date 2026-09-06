@@ -95,7 +95,7 @@ W1MER 的 codebase 文档分两层：
 
 ## 安装
 
-skill 包是自包含的——安装到宿主机的 skill 目录（如 `npx skills add <owner>/w1mer -a opencode -g`，或直接复制 `w1mer/` 目录），然后注册 host agents 与 CLI：
+skill 包是自包含的——安装到宿主机的 skill 目录（如 `npx skills add pjh456/w1mer -a opencode -g`，或直接复制 `w1mer/` 目录），然后注册 host agents 与 CLI：
 
 ```sh
 python3 <skill-dir>/scripts/w1mer.py install [--host opencode|claude-code|codex|all]

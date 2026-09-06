@@ -142,7 +142,7 @@ extra output, keeping the bill friendly.
 ## Install
 
 The skill package is self-contained — install it into your host's skill
-directory (e.g. `npx skills add <owner>/w1mer -a opencode -g`, or copy the
+directory (e.g. `npx skills add pjh456/w1mer -a opencode -g`, or copy the
 `w1mer/` directory), then register the host agents and the CLI:
 
 ```sh
