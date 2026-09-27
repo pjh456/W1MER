@@ -8,6 +8,8 @@ files are build artifacts (single-direction sync).
 Commands:
   init                    scaffold .w1mer/ from templates + copy w1mer.yaml
   install                 install host agents + CLI launcher (--host, --link)
+  batch-start <task>      record the batch boundary commit (STATE.json)
+  status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
   set <type> <id> --state <state>   update an entry's state
   list [--type <type>]    list entries (tree order for ids)
@@ -15,13 +17,17 @@ Commands:
 """
 
 import argparse
+import contextlib
 import datetime
+import json
 import os
 import re
 import shlex
 import shutil
 import stat
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
@@ -200,6 +206,115 @@ BODY_TEMPLATES = {
 
 
 # ---------------------------------------------------------------------------
+# state (STATE.json) — batch ledger + role liveness
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for execution state (commits, roles, timing), kept
+# separate from the planning docs (ROADMAP.md). Machine-maintained: agents
+# only touch it through the CLI, never by hand.
+#
+#   .w1mer/STATE.json  the state
+#   .w1mer/.lock       advisory lock (flock) serializing read-modify-write
+#
+# Concurrency model:
+#   - writes hold the lock across the whole load -> modify -> save cycle
+#   - save is temp-file + os.replace (atomic on POSIX), so a reader never sees
+#     a torn file; pure reads therefore need no lock
+#   - base/end are first-write-wins: once non-null they are never rewritten,
+#     which is what makes re-running a command idempotent ("do it for the
+#     main agent, but don't duplicate")
+
+STATE_NAME = "STATE.json"
+LOCK_NAME = ".lock"
+EXPECTED_ROLES = {
+    "main": ["reviewer", "implementer", "explorer"],
+    "sub": ["reviewer", "fixer"],
+}
+
+
+def state_path(cwd):
+    return Path(cwd) / ".w1mer" / STATE_NAME
+
+
+def lock_path(cwd):
+    return Path(cwd) / ".w1mer" / LOCK_NAME
+
+
+def now_iso():
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def empty_state():
+    return {"version": 1, "updated": None, "current": None, "tasks": {}}
+
+
+def load_state(cwd):
+    p = state_path(cwd)
+    if not p.exists():
+        return empty_state()
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        sys.exit(f"error: {p} is unreadable/corrupt ({e}); remove it and re-run")
+
+
+@contextlib.contextmanager
+def locked(cwd):
+    """Hold an exclusive advisory lock for the duration of a state mutation."""
+    try:
+        import fcntl
+    except ImportError:  # non-POSIX: best-effort, no lock
+        yield
+        return
+    lp = lock_path(cwd)
+    lp.parent.mkdir(parents=True, exist_ok=True)
+    with open(lp, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+
+
+def save_state(cwd, state):
+    """Write state atomically (temp + rename). Caller must hold locked()."""
+    state["updated"] = now_iso()
+    p = state_path(cwd)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), prefix=".STATE.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(state, fh, ensure_ascii=False, indent=2)
+            fh.write("\n")
+        os.replace(tmp, p)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def git_head(cwd):
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], cwd=cwd,
+                             capture_output=True, text=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        sys.exit(f"error: not a git repo (git rev-parse HEAD failed): {e}")
+    return out.stdout.strip()
+
+
+def task_entry(ttype):
+    """Fresh entry for a task, with all expected roles un-joined."""
+    return {
+        "type": ttype,
+        "base": None,
+        "end": None,
+        "roles": {r: {"joined": False, "at": None} for r in EXPECTED_ROLES[ttype]},
+        "started": now_iso(),
+        "ended": None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # commands
 # ---------------------------------------------------------------------------
 
@@ -297,6 +412,63 @@ def cmd_install(args):
             print("warning: no writable directory on PATH; run with --bin-dir <dir>")
         else:
             install_cli(bin_dir, link=args.link)
+
+
+def cmd_batch_start(cwd, args):
+    """Record the batch boundary: close the previous task, open the current one.
+
+    Idempotent: re-running keeps the existing base (first-write-wins) and the
+    existing role-join records, so a subagent can safely run it on the main
+    agent's behalf."""
+    ttype = args.type
+    head = git_head(cwd)
+    with locked(cwd):
+        state = load_state(cwd)
+        tasks = state["tasks"]
+        prev = state.get("current")
+        # close out the previous task, if this is a genuine transition
+        if prev and prev != args.task and prev in tasks and tasks[prev].get("end") is None:
+            tasks[prev]["end"] = head
+            tasks[prev]["ended"] = now_iso()
+        if args.task in tasks:
+            entry = tasks[args.task]
+            if entry.get("base") is None:
+                entry["base"] = head
+        else:
+            tasks[args.task] = task_entry(ttype)
+            tasks[args.task]["base"] = head
+        state["current"] = args.task
+        save_state(cwd, state)
+    print(f"batch-start {args.task}  base={head[:7]}  type={ttype}")
+
+
+def cmd_status(cwd, args):
+    """Show the current batch state and its derived completeness."""
+    state = load_state(cwd)
+    cur = state.get("current")
+    if not cur:
+        print("no active batch (STATE.json empty)")
+        return
+    entry = state["tasks"].get(cur)
+    if not entry:
+        print(f"current={cur} but no record in STATE.json")
+        return
+    ttype = entry.get("type", "main")
+    expected = EXPECTED_ROLES.get(ttype, [])
+    print(f"current: {cur}  (type={ttype})")
+    print(f"  base: {entry.get('base') or '-'}")
+    print(f"  end:  {entry.get('end') or '-'}")
+    for r in expected:
+        info = entry.get("roles", {}).get(r, {})
+        mark = "ok     " if info.get("joined") else "MISSING"
+        print(f"  role {r:<12} {mark}  {info.get('at') or ''}")
+    missing = [r for r in expected if not entry.get("roles", {}).get(r, {}).get("joined")]
+    if entry.get("end") is None:
+        print("  status: IN PROGRESS (end not set)")
+    elif missing:
+        print(f"  status: INCOMPLETE (missing roles: {', '.join(missing)})")
+    else:
+        print("  status: COMPLETE")
 
 
 def collect_files(tdef, cfg):
@@ -638,6 +810,13 @@ def main():
 
     p_init = sub.add_parser("init", help="scaffold .w1mer/ from templates")
 
+    p_bs = sub.add_parser("batch-start", help="record the batch boundary commit")
+    p_bs.add_argument("task", help="task id being started")
+    p_bs.add_argument("--type", default="main", choices=["main", "sub"],
+                     help="batch type (main|sub); picks the expected roles")
+
+    sub.add_parser("status", help="show current batch state + completeness")
+
     p_install = sub.add_parser("install", help="install host agents + CLI launcher")
     p_install.add_argument("--host", default="opencode", help="opencode | claude-code | codex | all (default: opencode)")
     p_install.add_argument("--no-cli", action="store_true", help="skip installing the w1mer CLI launcher")
@@ -680,6 +859,12 @@ def main():
         return
     if args.cmd == "install":
         cmd_install(args)
+        return
+    if args.cmd == "batch-start":
+        cmd_batch_start(Path.cwd(), args)
+        return
+    if args.cmd == "status":
+        cmd_status(Path.cwd(), args)
         return
     cfg = load_config(Path.cwd())
     if args.cmd == "new":
