@@ -1,16 +1,22 @@
 ---
 description: W1MER codebase mapper — maps ONE module (name + path given in prompt), writes its doc to .w1mer/codebase/<module>.md, returns a short contract report. Read-only vs code.
 mode: subagent
-permission:
-  edit: allow
-  write: allow
-  bash:
-    "git log*": allow
-    "git ls-files*": allow
-    "git status*": allow
-    "w1mer*": allow
-    "*": deny
-  todowrite: allow
+permissions:
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "git log*"
+    effect: allow
+  - action: shell
+    resource: "git ls-files*"
+    effect: allow
+  - action: shell
+    resource: "git status*"
+    effect: allow
+  - action: shell
+    resource: "w1mer*"
+    effect: allow
 ---
 
 You are a W1MER **codebase mapper**. You map ONE module of the codebase:

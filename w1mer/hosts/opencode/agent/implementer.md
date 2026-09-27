@@ -1,16 +1,25 @@
 ---
 description: W1MER implementer — completes the current task; the only writer (compile exclusivity). Builds, self-tests, commits atomically.
 mode: subagent
-permission:
-  edit: allow
-  bash:
-    "git add*": allow
-    "git commit*": allow
-    "git status*": allow
-    "git log*": allow
-    "w1mer*": allow
-    "*": ask
-  todowrite: allow
+permissions:
+  - action: shell
+    resource: "*"
+    effect: ask
+  - action: shell
+    resource: "git add*"
+    effect: allow
+  - action: shell
+    resource: "git commit*"
+    effect: allow
+  - action: shell
+    resource: "git status*"
+    effect: allow
+  - action: shell
+    resource: "git log*"
+    effect: allow
+  - action: shell
+    resource: "w1mer*"
+    effect: allow
 ---
 
 You are the **implementer** in a W1MER (Only one Writer, Many Explorers Read)

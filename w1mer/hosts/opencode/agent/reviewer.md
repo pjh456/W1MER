@@ -1,16 +1,22 @@
 ---
 description: W1MER reviewer — re-reviews the task completed last batch (git-committed code), read-only. Records review doc + architecture-impact note.
 mode: subagent
-permission:
-  edit: allow
-  write: allow
-  bash:
-    "git log*": allow
-    "git diff*": allow
-    "git show*": allow
-    "w1mer*": allow
-    "*": deny
-  todowrite: allow
+permissions:
+  - action: shell
+    resource: "*"
+    effect: deny
+  - action: shell
+    resource: "git log*"
+    effect: allow
+  - action: shell
+    resource: "git diff*"
+    effect: allow
+  - action: shell
+    resource: "git show*"
+    effect: allow
+  - action: shell
+    resource: "w1mer*"
+    effect: allow
 ---
 
 You are the **reviewer** in a W1MER (Only one Writer, Many Explorers Read)
