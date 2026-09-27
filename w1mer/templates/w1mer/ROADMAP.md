@@ -1,6 +1,8 @@
 # {project} — Roadmap
 
-> Lower number = higher priority. Priorities: performance > bug fixes > features.
+> Section order = kind priority (performance > bug fixes > features).
+> Within a section, open rows are ranked by `Defer` (desc), then ID.
+> `Defer` counts how many times the task was skipped (`w1mer defer <id>`).
 > Each completed task: mark `[x]` + date + commit, add a one-line measured
 > effect summary and `done`; full data goes to the results archive.
 > Insert new items with derived sub-ids (`05.1`, `05.1.2`); never batch-renumber.
@@ -18,26 +20,26 @@
 
 ## 一、Performance
 
-| # | Task | Doc | Status | Effect |
-|---|------|-----|--------|--------|
+| # | Task | Doc | Status | Defer | Effect |
+|---|------|-----|--------|-------|--------|
 <!-- w1mer:task:perf -->
 
 ## 二、Bug fixes
 
-| # | Task | Doc | Status | Effect |
-|---|------|-----|--------|--------|
+| # | Task | Doc | Status | Defer | Effect |
+|---|------|-----|--------|-------|--------|
 <!-- w1mer:task:bug -->
 
 ## 三、Features
 
-| # | Task | Doc | Status | Effect |
-|---|------|-----|--------|--------|
+| # | Task | Doc | Status | Defer | Effect |
+|---|------|-----|--------|-------|--------|
 <!-- w1mer:task:feature -->
 
 ## 四、Infrastructure
 
-| # | Task | Doc | Status | Effect |
-|---|------|-----|--------|--------|
+| # | Task | Doc | Status | Defer | Effect |
+|---|------|-----|--------|-------|--------|
 <!-- w1mer:task:infra -->
 
 ## 五、Backlog

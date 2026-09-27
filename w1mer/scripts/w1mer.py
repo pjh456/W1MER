@@ -18,6 +18,7 @@ Commands:
   set <type> <id> --state <state>   update an entry's state
   list [--type <type>]    list entries (task default: todo+issue; --all /
                                     --todo/--done/--issue/--reviewed to filter)
+  defer <id>              increment a task row's defer counter (it was skipped)
   build                   regenerate all INDEX files
 """
 
@@ -717,7 +718,7 @@ def insert_roadmap_row(cwd, nid, title, doc, section):
     marker = f"<!-- w1mer:task:{section} -->"
     if marker not in text:
         sys.exit(f"error: ROADMAP.md missing marker {marker} (sections: perf/bug/feature/infra/backlog)")
-    line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | |"
+    line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | 0 | |"
     pos = text.index(marker) + len(marker)
     lines = text[pos:].split("\n")
     # skip leading blank lines after the marker
@@ -800,19 +801,46 @@ def set_roadmap_task(cwd, args):
         if not m:
             sys.exit(f"error: task {args.id} not found in ROADMAP.md")
     cells = [c.strip() for c in split_cells(m.group(2))]
-    # cells: [task, doc, status, effect?]; pad to 4
+    # cells: [task, doc, status, defer, effect?]; pad to 5
     while cells and cells[0] == "":
         cells.pop(0)
-    while len(cells) < 4:
+    while len(cells) < 5:
         cells.append("")
     if args.state:
         cells[2] = args.state
     if args.effect:
-        cells[3] = args.effect
+        cells[4] = args.effect
     new_row = "| " + str(args.id) + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
     text = text[: m.start()] + new_row + text[m.end():]
     road.write_text(text, encoding="utf-8")
-    print(f"task {args.id}: state={cells[2]} effect={cells[3]}")
+    print(f"task {args.id}: state={cells[2]} effect={cells[4]}")
+
+
+def cmd_defer(cwd, args):
+    """Increment a task row's defer counter — the orchestrator skipped an
+    open task. Repeated deferrals push the task to the top of its section
+    on the next `re-rank`."""
+    road = Path(cwd) / PLANNING_DIR / "ROADMAP.md"
+    if not road.exists():
+        sys.exit("error: .w1mer/ROADMAP.md missing (run 'w1mer init')")
+    text = road.read_text(encoding="utf-8")
+    pattern = re.compile(rf"^(\| {re.escape(str(args.id))} \|)([^\n]*?)(\|)$", re.M)
+    m = pattern.search(text)
+    if not m:
+        sys.exit(f"error: task {args.id} not found in ROADMAP.md")
+    cells = [c.strip() for c in split_cells(m.group(2))]
+    # cells: [task, doc, status, defer, effect?]
+    while cells and cells[0] == "":
+        cells.pop(0)
+    while len(cells) < 5:
+        cells.append("")
+    if not re.fullmatch(r"\d*", cells[3]):
+        sys.exit(f"error: task {args.id} defer cell is not a number: {cells[3]!r}")
+    n = int(cells[3]) + 1
+    cells[3] = str(n)
+    new_row = "| " + str(args.id) + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
+    road.write_text(text[: m.start()] + new_row + text[m.end():], encoding="utf-8")
+    print(f"task {args.id}: defer -> {n}")
 
 
 def preorder_sort(ids, domain_order=None):
@@ -1079,6 +1107,9 @@ def main():
     p_set.add_argument("--doc", default=None, help="doc column (register-if-missing only)")
     p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (register-if-missing only)")
 
+    p_defer = sub.add_parser("defer", help="increment a task row's defer counter (orchestrator skipped it)")
+    p_defer.add_argument("id", help="task id")
+
     p_list = sub.add_parser("list", help="list entries")
     p_list.add_argument("--type", default=None)
     p_list.add_argument("--all", action="store_true", help="task: show all four states")
@@ -1128,6 +1159,8 @@ def main():
         cmd_show(Path.cwd(), cfg, args)
     elif args.cmd == "sync":
         cmd_sync(Path.cwd(), cfg, args)
+    elif args.cmd == "defer":
+        cmd_defer(Path.cwd(), args)
 
 
 if __name__ == "__main__":
