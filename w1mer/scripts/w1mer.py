@@ -10,6 +10,7 @@ Commands:
   install                 install host agents + CLI launcher (--host, --link)
   batch-start <task>      record the batch boundary commit (gates completeness)
   batch-end <task>        explicitly close the current task (end = HEAD)
+  ensure <task>           idempotently make this task current (subagent startup)
   role-join <task> <role> mark a role as launched (subagent startup)
   status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
@@ -422,43 +423,67 @@ def cmd_install(args):
             install_cli(bin_dir, link=args.link)
 
 
+def _start_task(state, task, ttype, head, gate):
+    """Shared core of batch-start / ensure: close the previous task, open this
+    one, set current. Returns (ok, msg); ok=False means the completeness gate
+    blocked (msg is the reason). The gate is the only difference between the
+    two commands — ensure defers it to the main agent's next batch-start."""
+    tasks = state["tasks"]
+    prev = state.get("current")
+    if prev and prev != task and prev in tasks:
+        if tasks[prev].get("end") is None:
+            tasks[prev]["end"] = head
+            tasks[prev]["ended"] = now_iso()
+        if gate:
+            missing = missing_roles(tasks[prev])
+            if missing and not task.startswith(prev + "."):
+                return False, (f"previous task {prev} INCOMPLETE (missing roles: "
+                               f"{', '.join(missing)}); repair it via sub-batch "
+                               f"{prev}.1 before starting {task}")
+    if task in tasks:
+        entry = tasks[task]
+        if entry.get("base") is None:
+            entry["base"] = head
+    else:
+        tasks[task] = task_entry(ttype)
+        tasks[task]["base"] = head
+    state["current"] = task
+    return True, None
+
+
 def cmd_batch_start(cwd, args):
     """Record the batch boundary: close the previous task, open the current one.
 
-    Idempotent: re-running keeps the existing base (first-write-wins) and the
-    existing role-join records, so a subagent can safely run it on the main
-    agent's behalf.
-
-    Completeness gate: leaving a task requires all its expected roles to have
-    joined, EXCEPT when the new task is a sub-id of it (05 -> 05.1) — that is
-    the repair sub-batch, which exists precisely because the parent is
-    incomplete."""
+    Idempotent (first-write-wins on base/role-joins). Completeness gate:
+    leaving a task requires all its expected roles to have joined, EXCEPT when
+    the new task is a sub-id of it (05 -> 05.1) — the repair sub-batch, which
+    exists precisely because the parent is incomplete."""
     ttype = args.type
     head = git_head(cwd)
     with locked(cwd):
         state = load_state(cwd)
-        tasks = state["tasks"]
-        prev = state.get("current")
-        if prev and prev != args.task and prev in tasks:
-            if tasks[prev].get("end") is None:
-                tasks[prev]["end"] = head
-                tasks[prev]["ended"] = now_iso()
-            missing = missing_roles(tasks[prev])
-            if missing and not args.task.startswith(prev + "."):
-                save_state(cwd, state)  # persist the close, then block
-                sys.exit(f"error: previous task {prev} INCOMPLETE (missing roles: "
-                         f"{', '.join(missing)}); repair it via sub-batch "
-                         f"{prev}.1 before starting {args.task}")
-        if args.task in tasks:
-            entry = tasks[args.task]
-            if entry.get("base") is None:
-                entry["base"] = head
-        else:
-            tasks[args.task] = task_entry(ttype)
-            tasks[args.task]["base"] = head
-        state["current"] = args.task
+        ok, msg = _start_task(state, args.task, ttype, head, gate=True)
         save_state(cwd, state)
+        if not ok:
+            sys.exit(f"error: {msg}")
     print(f"batch-start {args.task}  base={head[:7]}  type={ttype}")
+
+
+def cmd_ensure(cwd, args):
+    """Idempotent 'make this task the current, in-progress task'.
+
+    This is what a subagent runs on startup: if the main agent already ran
+    batch-start it is a no-op; if the main agent was compacted and never ran
+    it, this does it on the main agent's behalf. No completeness gate — a
+    subagent joining its own task is not 'moving on', so the gate (which
+    guards the main agent's progress) is deferred to the next batch-start."""
+    ttype = args.type
+    head = git_head(cwd)
+    with locked(cwd):
+        state = load_state(cwd)
+        _start_task(state, args.task, ttype, head, gate=False)
+        save_state(cwd, state)
+    print(f"ensure {args.task}  base={head[:7]}  type={ttype}")
 
 
 def cmd_batch_end(cwd, args):
@@ -881,6 +906,11 @@ def main():
     p_be = sub.add_parser("batch-end", help="explicitly close the current task (end = HEAD)")
     p_be.add_argument("task")
 
+    p_ens = sub.add_parser("ensure", help="idempotently make this task current (subagent startup)")
+    p_ens.add_argument("task")
+    p_ens.add_argument("--type", default="main", choices=["main", "sub"],
+                      help="batch type (main|sub); picks the expected roles")
+
     sub.add_parser("status", help="show current batch state + completeness")
 
     p_rj = sub.add_parser("role-join", help="mark a role as launched (subagent startup)")
@@ -935,6 +965,9 @@ def main():
         return
     if args.cmd == "batch-end":
         cmd_batch_end(Path.cwd(), args)
+        return
+    if args.cmd == "ensure":
+        cmd_ensure(Path.cwd(), args)
         return
     if args.cmd == "status":
         cmd_status(Path.cwd(), args)
