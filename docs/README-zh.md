@@ -114,7 +114,7 @@ W1MER/
 └── w1mer/              # skill 包（自包含；整体复制即可安装）
     ├── SKILL.md        #   skill 入口（Anthropic Agent Skills 格式）
     ├── references/     #   角色 / 调度 / 归档 / codebase 规范
-    ├── templates/      #   .w1mer/ 脚手架 + w1mer.yaml 注册表
+    ├── templates/      #   .w1mer/ 脚手架 + schema.yaml 注册表
     ├── scripts/        #   w1mer.py CLI（init/install/new/set/list/build/sync）
     └── hosts/          #   宿主特定的 agent 定义
         ├── opencode/   #     .opencode/agent/*.md（install → ~/.config/opencode/agents/）

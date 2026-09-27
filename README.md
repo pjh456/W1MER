@@ -168,7 +168,7 @@ W1MER/
 └── w1mer/              # the skill package (self-contained; install whole dir)
     ├── SKILL.md        #   skill entry (Anthropic Agent Skills format)
     ├── references/     #   roles / scheduling / archive / codebase specs
-    ├── templates/      #   .w1mer/ scaffold + w1mer.yaml registry
+    ├── templates/      #   .w1mer/ scaffold + schema.yaml registry
     ├── scripts/        #   w1mer.py CLI (init/install/new/set/list/build/sync)
     └── hosts/          #   host-specific agent definitions
         ├── opencode/   #     .opencode/agent/*.md (install → ~/.config/opencode/agents/)

@@ -2,11 +2,11 @@
 """w1mer — metadata-driven archive CLI.
 
 Single-file, stdlib-only. Operates the .w1mer/ planning archive defined by
-the w1mer.yaml type registry. Content files are the source of truth; INDEX
-files are build artifacts (single-direction sync).
+the .w1mer/schema.yaml type registry. Content files are the source of truth;
+INDEX files are build artifacts (single-direction sync).
 
 Commands:
-  init                    scaffold .w1mer/ from templates + copy w1mer.yaml
+  init                    scaffold .w1mer/ from templates (incl. schema.yaml)
   install                 install host agents + CLI launcher (--host, --link)
   batch-start <task>      record the batch boundary commit (gates completeness)
   batch-end <task>        explicitly close the current task (end = HEAD)
@@ -36,7 +36,8 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = SKILL_ROOT / "templates"
-CONFIG_NAME = "w1mer.yaml"
+CONFIG_NAME = "schema.yaml"
+PLANNING_DIR = ".w1mer"
 
 HOSTS = {
     "opencode": {
@@ -91,9 +92,9 @@ def parse_yaml(text):
 
 
 def load_config(cwd):
-    path = Path(cwd) / CONFIG_NAME
+    path = Path(cwd) / PLANNING_DIR / CONFIG_NAME
     if not path.exists():
-        sys.exit(f"error: {CONFIG_NAME} not found (run 'w1mer init' first)")
+        sys.exit(f"error: {PLANNING_DIR}/{CONFIG_NAME} not found (run 'w1mer init' first)")
     return parse_yaml(path.read_text(encoding="utf-8"))
 
 
@@ -330,17 +331,14 @@ def task_entry(ttype):
 
 
 def cmd_init(cwd):
-    dst = Path(cwd) / ".w1mer"
+    dst = Path(cwd) / PLANNING_DIR
     if dst.exists() and any(dst.iterdir()):
-        sys.exit("error: .w1mer/ already exists and is not empty")
+        sys.exit(f"error: {PLANNING_DIR}/ already exists and is not empty")
     dst.mkdir(parents=True, exist_ok=True)
     src = TEMPLATES / "w1mer"
     shutil.copytree(src, dst, dirs_exist_ok=True)
-    cfg_dst = Path(cwd) / CONFIG_NAME
-    if not cfg_dst.exists():
-        shutil.copy(TEMPLATES / CONFIG_NAME, cfg_dst)
-        print(f"created {CONFIG_NAME}")
-    print(f"scaffolded .w1mer/ from templates")
+    shutil.copy(TEMPLATES / CONFIG_NAME, dst / CONFIG_NAME)
+    print(f"scaffolded {PLANNING_DIR}/ from templates (incl. {CONFIG_NAME})")
 
 
 def pick_bin_dir():
@@ -560,7 +558,7 @@ def cmd_show(cwd, cfg, args):
 
     if end is None:
         sys.exit(f"error: task {args.task} is in progress (end not set); nothing to show")
-    exclude = cfg.get("planning_dir", ".w1mer")
+    exclude = PLANNING_DIR
     argv = ["git", "diff"]
     if args.stat:
         argv.append("--stat")
@@ -606,7 +604,7 @@ def cmd_status(cwd, args):
 
 def collect_files(tdef, cfg):
     """Return dict {id: path} for all content files of a type (excluding INDEX)."""
-    root = Path.cwd() / cfg.get("planning_dir", ".w1mer")
+    root = Path.cwd() / PLANNING_DIR
     d = root / tdef["dir"]
     out = {}
     if not d.exists():
@@ -646,7 +644,7 @@ def cmd_new(cwd, cfg, args):
     # build file name
     slug = args.slug or slugify(args.title or nid)
     fname = tdef["file"].replace("{id}", nid).replace("{slug}", slug)
-    d = Path(cwd) / cfg.get("planning_dir", ".w1mer") / tdef["dir"]
+    d = Path(cwd) / PLANNING_DIR / tdef["dir"]
     d.mkdir(parents=True, exist_ok=True)
     path = d / fname
     body = BODY_TEMPLATES.get(args.type, "# {id}\n\n").format(id=nid, state=state, title=meta["title"])
@@ -808,7 +806,7 @@ def cmd_list(cwd, cfg, args):
         types = {args.type: get_type(cfg, args.type)}
     else:
         types = cfg.get("types", {})
-    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    root = Path(cwd) / PLANNING_DIR
     for tname, tdef in types.items():
         if tname == "task":
             list_roadmap_tasks(cwd)
@@ -841,7 +839,7 @@ def list_roadmap_tasks(cwd):
 
 
 def cmd_build(cwd, cfg):
-    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    root = Path(cwd) / PLANNING_DIR
     for tname, tdef in cfg.get("types", {}).items():
         d = root / tdef["dir"]
         idx = d / "INDEX.md"
@@ -879,7 +877,7 @@ def cmd_sync(cwd, cfg, args):
       - [ARCHITECTURE] contract X changed
     Untagged lines are listed as 'unassigned'. --apply writes the deltas
     under a dated heading in each target doc and clears CHANGES.md."""
-    root = Path(cwd) / cfg.get("planning_dir", ".w1mer")
+    root = Path(cwd) / PLANNING_DIR
     changes = root / "detail" / "CHANGES.md"
     if not changes.exists():
         sys.exit("error: .w1mer/detail/CHANGES.md missing (run 'w1mer init')")

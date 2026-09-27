@@ -108,7 +108,7 @@ w1mer build                                        # regenerate all INDEX files
 w1mer sync [--apply]                               # compact deltas into stable docs
 ```
 
-The type registry lives in `w1mer.yaml` (directory, file-naming pattern,
+The type registry lives in `.w1mer/schema.yaml` (directory, file-naming pattern,
 state machine). States live in YAML frontmatter of content files — content is
 the source of truth; INDEX files are build artifacts (single-direction sync).
 

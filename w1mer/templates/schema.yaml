@@ -1,9 +1,7 @@
-# W1MER archive type registry
-# Copy to project root as `w1mer.yaml`, adjust per project.
+# W1MER archive schema
+# Lives in .w1mer/ (self-contained: schema + state + content).
 # Types declare: directory, file-naming pattern, state machine.
 # Content files are the source of truth; INDEX files are `w1mer build` artifacts.
-
-planning_dir: ".w1mer"
 
 types:
   task:
@@ -40,6 +38,3 @@ types:
     file: "{id}_{slug}.md"
     index: [id, title, state, doc]
     states: [active, archived]
-
-# Optional: language of generated docs
-lang: en

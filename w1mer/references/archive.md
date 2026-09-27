@@ -48,18 +48,19 @@ with a raw `|` in a cell breaks the row — go through the CLI.
 
 ## Type registry
 
-Types are declared in `w1mer.yaml` at the project root. Each type declares:
+Types are declared in `.w1mer/schema.yaml` (self-contained with the archive).
+Each type declares:
 
 ```yaml
 types:
   review:
-    dir: ".w1mer/review"
+    dir: "review"               # relative to .w1mer/
     id: "R_{roadmap}"            # derived from parent task id; "." → "_"
     file: "{id}.md"
     index: [id, task, state, doc]   # INDEX table columns
     states: [pending, ok, issues, fixed, re-reviewed]
   bug:
-    dir: ".w1mer/bug_reason"
+    dir: "bug_reason"
     id: "B{seq:03}"              # auto-incrementing sequence
     file: "{id}_{slug}.md"
     index: [id, title, error, module, doc]
