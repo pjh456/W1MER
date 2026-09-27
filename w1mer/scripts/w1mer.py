@@ -964,7 +964,7 @@ def preorder_sort(ids, domain_order=None):
                 dom, seq = dm.group(1), int(dm.group(2))
                 dom_idx = domain_order.index(dom) if dom in domain_order else len(domain_order)
                 return (dom_idx, seq)
-        prefix = re.split(r"\d", s, 1)[0]          # leading non-digit prefix
+        prefix = re.split(r"\d", s, maxsplit=1)[0]  # leading non-digit prefix
         nums = tuple(int(m) for m in re.findall(r"\d+", s))
         return (prefix, nums, s)
 
