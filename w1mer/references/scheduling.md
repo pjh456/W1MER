@@ -71,6 +71,18 @@ base|end` reads a file at an endpoint. The Reviewer reads `end`; the Explorer
 reads `base`. Both read git objects, never the working tree — so the
 implementer's in-flight edits are invisible to them.
 
+**Batch boundary ritual** (after `batch-end`, before the next
+`batch-start`):
+
+1. `w1mer re-rank` — deterministic: re-sorts each section by (defer desc,
+   id asc); closed rows sink with defer reset.
+2. Re-prioritize where judgment is needed: `w1mer set task <id> --section
+   <s>` (backlog graduation, kind correction).
+3. Pick the `*` row from `w1mer list` — the top open task.
+4. If the orchestrator skips an open task instead, record it:
+   `w1mer defer <id>` — every skip is a promotion step at the next
+   `re-rank`, so a task cannot be deferred forever.
+
 ## Interrupt recovery
 
 An agent that exits abnormally / returns empty is treated as an *unfinished

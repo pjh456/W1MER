@@ -85,3 +85,9 @@ to finish the half-done work. Use a Fixer whenever a repair is the right job.
 If an agent discovers a bug **not** introduced by the current task, report it
 to the orchestrator only — never write it into archive documents (it would
 pollute the task's effect record).
+
+The orchestrator registers it as a task in the **bug** section (`w1mer new
+task --section bug`) — not the backlog: kind priority already ranks bugs
+above features. At the next batch boundary, `re-rank` + the top-row pick
+surface it; repeated skips push it to the top of its section via `defer`,
+so a discovered issue cannot be deferred forever.

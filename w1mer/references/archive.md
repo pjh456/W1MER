@@ -27,19 +27,24 @@ w1mer show <task> [--stat] [--file <p> --at base|end]
 w1mer status                                 # current batch state + completeness
 w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
                                     # task default: todo+issue
+w1mer defer <task>                 # increment a task's defer counter (it was skipped)
+w1mer re-rank                      # re-sort sections by (defer desc, id asc); closed rows sink
 w1mer build                      # regenerate all INDEX files
 w1mer sync [--apply]             # compact deltas into per-module codebase docs
 ```
 
 `task` rows live in `ROADMAP.md`; `set task 01 --state done --effect "+22%"`
-updates a row directly. With `--register-if-missing`, a missing row is
+updates a row directly; `set task 01 --section bug` moves a row across
+sections (re-prioritization). With `--register-if-missing`, a missing row is
 registered first (state `todo`, then the given `--state`/`--effect` applied),
 so a reviewer can append a follow-up sub-id in one call. Other types are
 per-entry files.
 
-`list` filters task rows by state: default shows `todo` + `issue` (the active
-work); `--all` shows all four; `--todo/--done/--issue/--reviewed` show exactly
-the selected states (combinable). This keeps long ROADMAPs cheap to read.
+`list` shows task rows in pick order (section order → defer desc → id; the
+top open row is marked `*` = the next pick). It filters task rows by state:
+default shows `todo` + `issue` (the active work); `--all` shows all four;
+`--todo/--done/--issue/--reviewed` show exactly the selected states
+(combinable). This keeps long ROADMAPs cheap to read.
 
 Batch state (`batch-start` / `batch-end` / `ensure` / `role-join` / `show` /
 `status`) lives in `.w1mer/STATE.json` — a per-task ledger of base/end commits,

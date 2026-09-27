@@ -80,6 +80,10 @@ intact when the orchestrator is compacted):
   roles did not join — a dropped implementer is exposed at the next boundary.
 - `w1mer show <task>` reads the committed diff / file content at an endpoint
   from git objects, so readers never see the implementer's in-flight edits.
+- **Batch boundary ritual**: `w1mer re-rank` → re-prioritize where judgment
+  is needed (`set task <id> --section <s>`) → pick the `*` row from
+  `w1mer list`; skipped open tasks are recorded with `w1mer defer <id>` —
+  every skip is a promotion step, so nothing defers forever.
 
 Full protocol in `references/scheduling.md` (Batch lifecycle).
 
@@ -105,6 +109,8 @@ w1mer batch-start <task>     # record batch boundary (STATE.json)
 w1mer show <task>            # committed diff / file at an endpoint
 w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
                                        # task default: todo+issue
+w1mer defer <task>                # a task was skipped (promotion step)
+w1mer re-rank                     # re-sort sections by (defer desc, id asc)
 w1mer build                                        # regenerate all INDEX files
 w1mer sync [--apply]                               # compact deltas into stable docs
 ```
