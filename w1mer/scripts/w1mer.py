@@ -118,6 +118,39 @@ def write_frontmatter(path, meta, body):
 
 
 # ---------------------------------------------------------------------------
+# table cells (Markdown rows)
+# ---------------------------------------------------------------------------
+
+
+def esc_cell(s):
+    """Escape a value for a Markdown table cell: '\\' -> '\\\\', '|' -> '\\|'."""
+    return s.replace("\\", "\\\\").replace("|", "\\|")
+
+
+def split_cells(s):
+    """Split a table row's inner text on unescaped '|' and unescape the cells.
+
+    Inverse of joining esc_cell()ed values with ' | '.
+    """
+    cells, cur, i, n = [], [], 0, len(s)
+    while i < n:
+        c = s[i]
+        if c == "\\" and i + 1 < n and s[i + 1] in "|\\":
+            cur.append("|" if s[i + 1] == "|" else "\\")
+            i += 2
+            continue
+        if c == "|":
+            cells.append("".join(cur))
+            cur = []
+            i += 1
+            continue
+        cur.append(c)
+        i += 1
+    cells.append("".join(cur))
+    return cells
+
+
+# ---------------------------------------------------------------------------
 # ids
 # ---------------------------------------------------------------------------
 
@@ -343,7 +376,7 @@ def add_roadmap_task(cwd, args):
         sys.exit(f"error: ROADMAP.md missing marker {marker} (sections: perf/bug/feature/infra/backlog)")
     title = args.title or f"task {nid}"
     doc = args.doc or "—"
-    line = f"| {nid} | {title} | {doc} | todo | |"
+    line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | |"
     pos = text.index(marker) + len(marker)
     lines = text[pos:].split("\n")
     # skip leading blank lines after the marker
@@ -410,20 +443,17 @@ def set_roadmap_task(cwd, args):
     m = pattern.search(text)
     if not m:
         sys.exit(f"error: task {args.id} not found in ROADMAP.md")
-    cells = [p.strip() for p in m.group(2).split("|")]
-    # cells: ['', task, doc, status, effect, ''] → drop empties but keep effect if blank
-    while cells and cells[-1] == "":
-        cells.pop()
+    cells = [c.strip() for c in split_cells(m.group(2))]
+    # cells: [task, doc, status, effect?]; pad to 4
     while cells and cells[0] == "":
         cells.pop(0)
-    # cells now: [task, doc, status, effect?]; pad to 4
     while len(cells) < 4:
         cells.append("")
     if args.state:
         cells[2] = args.state
     if args.effect:
         cells[3] = args.effect
-    new_row = "| " + str(args.id) + " | " + " | ".join(cells) + " |"
+    new_row = "| " + str(args.id) + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
     text = text[: m.start()] + new_row + text[m.end():]
     road.write_text(text, encoding="utf-8")
     print(f"task {args.id}: state={cells[2]} effect={cells[3]}")
@@ -472,9 +502,12 @@ def list_roadmap_tasks(cwd):
         return
     rows = []
     for line in road.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^\| (\d+(?:\.\d+)*) \|([^|]+)\|([^|]+)\|([^|]+)\|", line)
+        m = re.match(r"^\| (\d+(?:\.\d+)*) \|(.*)\|$", line)
         if m:
-            rows.append((m.group(1), m.group(4).strip(), m.group(2).strip()))
+            cells = [c.strip() for c in split_cells(m.group(2))]
+            # cells: [task, doc, status, effect?]
+            if len(cells) >= 3:
+                rows.append((m.group(1), cells[2], cells[0]))
     if rows:
         print("\n[task]")
     for nid, status, title in sorted(rows, key=lambda r: tuple(int(p) for p in r[0].split("."))):
@@ -498,7 +531,7 @@ def cmd_build(cwd, cfg):
                 if c == "doc":
                     vals.append(f"[{files[nid].name}]({files[nid].name})")
                 else:
-                    vals.append(meta.get(c, ""))
+                    vals.append(esc_cell(meta.get(c, "")))
             rows.append("| " + " | ".join(vals) + " |")
         text = idx.read_text(encoding="utf-8")
         if "<!-- w1mer:rows -->" not in text:

@@ -25,6 +25,10 @@ w1mer sync [--apply]             # compact deltas into stable codebase docs
 `task` rows live in `ROADMAP.md`; `set task 01 --state done --effect "+22%"`
 updates a row directly. Other types are per-entry files.
 
+Cell escaping: table cells are escaped on write (`|` → `\|`, `\` → `\\`)
+and unescaped on read, so titles/effects may contain `|`. Hand-editing a row
+with a raw `|` in a cell breaks the row — go through the CLI.
+
 ## Type registry
 
 Types are declared in `w1mer.yaml` at the project root. Each type declares:
