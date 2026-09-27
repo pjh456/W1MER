@@ -710,16 +710,12 @@ def add_roadmap_task(cwd, args):
     print(f"added task {nid}: {title}  [{section}]")
 
 
-def insert_roadmap_row(cwd, nid, title, doc, section):
-    """Insert a task row with an explicit id into the section, pre-order sorted."""
-    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
-    text = road.read_text(encoding="utf-8")
-    if nid in task_existing_ids(text):
-        sys.exit(f"error: task {nid} already exists")
+def insert_row_into_section(text, nid, row, section):
+    """Insert a task row into the section's contiguous row block, pre-order
+    sorted. Pure text transform."""
     marker = f"<!-- w1mer:task:{section} -->"
     if marker not in text:
         sys.exit(f"error: ROADMAP.md missing marker {marker} (sections: perf/bug/feature/infra/backlog)")
-    line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | 0 | |"
     pos = text.index(marker) + len(marker)
     lines = text[pos:].split("\n")
     # skip leading blank lines after the marker
@@ -733,12 +729,21 @@ def insert_roadmap_row(cwd, nid, title, doc, section):
         region_end += 1
     task_rows = lines[:region_end]
     tail = lines[region_end:]
-    task_rows.append(line)
+    task_rows.append(row)
     # pre-order sort by ID column only: (1,) < (1,1) < (1,1,1) < (1,2) < (2,)
     task_rows.sort(key=task_row_key)
     block = "\n".join(task_rows) + "\n\n" + "\n".join(tail).rstrip() + "\n"
-    text = text[:pos] + "\n" + block
-    road.write_text(text, encoding="utf-8")
+    return text[:pos] + "\n" + block
+
+
+def insert_roadmap_row(cwd, nid, title, doc, section):
+    """Insert a task row with an explicit id into the section, pre-order sorted."""
+    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    text = road.read_text(encoding="utf-8")
+    if nid in task_existing_ids(text):
+        sys.exit(f"error: task {nid} already exists")
+    line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | 0 | |"
+    road.write_text(insert_row_into_section(text, nid, line, section), encoding="utf-8")
 
 
 def task_row_key(row):
@@ -757,8 +762,8 @@ def find_file(tdef, cfg, nid):
 def cmd_set(cwd, cfg, args):
     tdef = get_type(cfg, args.type)
     if args.type == "task":
-        if not args.state and not args.effect and not args.register_if_missing:
-            sys.exit("error: provide --state and/or --effect for task rows")
+        if not args.state and not args.effect and not args.register_if_missing and not args.section:
+            sys.exit("error: provide --state, --effect, --section, and/or --register-if-missing for task rows")
         if args.state:
             states = tdef.get("states", [])
             if states and args.state not in states:
@@ -801,6 +806,17 @@ def set_roadmap_task(cwd, args):
         m = pattern.search(text)
         if not m:
             sys.exit(f"error: task {args.id} not found in ROADMAP.md")
+    if args.section:
+        cur = row_section(text, str(args.id))
+        if cur != args.section:
+            row = text[m.start():m.end()]
+            end = m.end() + (1 if text[m.end():m.end() + 1] == "\n" else 0)
+            text = text[: m.start()] + text[end:]
+            text = insert_row_into_section(text, str(args.id), row, args.section)
+            m = pattern.search(text)
+            if not m:
+                sys.exit(f"error: task {args.id} not found after move")
+            print(f"task {args.id}: moved {cur} -> {args.section}")
     cells = [c.strip() for c in split_cells(m.group(2))]
     # cells: [task, doc, status, defer, effect?]; pad to 5
     while cells and cells[0] == "":
@@ -864,6 +880,15 @@ def roadmap_sections(text):
             region_end += 1
         out.append((m.group(1), pos, i, region_end, lines[i:region_end]))
     return out
+
+
+def row_section(text, nid):
+    """Section name containing the task row, or None."""
+    pat = re.compile(rf"^\| {re.escape(nid)} \|")
+    for section, pos, i, region_end, rows in roadmap_sections(text):
+        if any(pat.match(r) for r in rows):
+            return section
+    return None
 
 
 def row_cells(row):
@@ -1186,7 +1211,7 @@ def main():
                        help="task: register the row in ROADMAP.md first if it is missing")
     p_set.add_argument("--title", default=None, help="title (register-if-missing only)")
     p_set.add_argument("--doc", default=None, help="doc column (register-if-missing only)")
-    p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (register-if-missing only)")
+    p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (move the row; register-if-missing only)")
 
     p_defer = sub.add_parser("defer", help="increment a task row's defer counter (orchestrator skipped it)")
     p_defer.add_argument("id", help="task id")
