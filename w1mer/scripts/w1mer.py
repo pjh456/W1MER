@@ -16,7 +16,8 @@ Commands:
   status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
   set <type> <id> --state <state>   update an entry's state
-  list [--type <type>]    list entries (tree order for ids)
+  list [--type <type>]    list entries (task default: todo+issue; --all /
+                                    --todo/--done/--issue/--reviewed to filter)
   build                   regenerate all INDEX files
 """
 
@@ -832,15 +833,27 @@ def preorder_sort(ids, domain_order=None):
     return sorted(ids, key=key)
 
 
+def task_shown_set(args):
+    """Which task states `list` shows. Default: todo + issue (the active work).
+    --all shows all four; any of --todo/--done/--issue/--reviewed shows exactly
+    those (replacing the default)."""
+    if args.all:
+        return {"todo", "done", "reviewed", "issue"}
+    selected = {s for s, on in (("todo", args.todo), ("done", args.done),
+                                 ("issue", args.issue), ("reviewed", args.reviewed)) if on}
+    return selected or {"todo", "issue"}
+
+
 def cmd_list(cwd, cfg, args):
     if args.type:
         types = {args.type: get_type(cfg, args.type)}
     else:
         types = cfg.get("types", {})
+    shown = task_shown_set(args)
     root = Path(cwd) / PLANNING_DIR
     for tname, tdef in types.items():
         if tname == "task":
-            list_roadmap_tasks(cwd)
+            list_roadmap_tasks(cwd, shown)
             continue
         files = collect_files(tdef, cfg)
         if not files:
@@ -851,7 +864,7 @@ def cmd_list(cwd, cfg, args):
             print(f"  {nid:<8} {meta.get('state','?'):<14} {meta.get('title','')}")
 
 
-def list_roadmap_tasks(cwd):
+def list_roadmap_tasks(cwd, shown):
     road = Path(cwd) / ".w1mer" / "ROADMAP.md"
     if not road.exists():
         return
@@ -861,7 +874,7 @@ def list_roadmap_tasks(cwd):
         if m:
             cells = [c.strip() for c in split_cells(m.group(2))]
             # cells: [task, doc, status, effect?]
-            if len(cells) >= 3:
+            if len(cells) >= 3 and cells[2] in shown:
                 rows.append((m.group(1), cells[2], cells[0]))
     if rows:
         print("\n[task]")
@@ -1029,6 +1042,11 @@ def main():
 
     p_list = sub.add_parser("list", help="list entries")
     p_list.add_argument("--type", default=None)
+    p_list.add_argument("--all", action="store_true", help="task: show all four states")
+    p_list.add_argument("--todo", action="store_true", help="task: include todo")
+    p_list.add_argument("--done", action="store_true", help="task: include done")
+    p_list.add_argument("--issue", action="store_true", help="task: include issue")
+    p_list.add_argument("--reviewed", action="store_true", help="task: include reviewed")
 
     sub.add_parser("build", help="regenerate INDEX files")
 

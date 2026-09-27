@@ -103,7 +103,8 @@ w1mer new <type> [--parent <id>] [--title "..."]   # create an entry
 w1mer set <type> <id> --state <state>              # update state
 w1mer batch-start <task>     # record batch boundary (STATE.json)
 w1mer show <task>            # committed diff / file at an endpoint
-w1mer list [--type <type>]                         # list entries
+w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
+                                       # task default: todo+issue
 w1mer build                                        # regenerate all INDEX files
 w1mer sync [--apply]                               # compact deltas into stable docs
 ```

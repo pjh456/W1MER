@@ -25,7 +25,8 @@ w1mer ensure <task> [--type main|sub]        # idempotent batch-start (subagent 
 w1mer role-join <task> <role>                # record role liveness
 w1mer show <task> [--stat] [--file <p> --at base|end]
 w1mer status                                 # current batch state + completeness
-w1mer list [--type <type>] [--sort tree]
+w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
+                                    # task default: todo+issue
 w1mer build                      # regenerate all INDEX files
 w1mer sync [--apply]             # compact deltas into stable codebase docs
 ```
@@ -35,6 +36,10 @@ updates a row directly. With `--register-if-missing`, a missing row is
 registered first (state `todo`, then the given `--state`/`--effect` applied),
 so a reviewer can append a follow-up sub-id in one call. Other types are
 per-entry files.
+
+`list` filters task rows by state: default shows `todo` + `issue` (the active
+work); `--all` shows all four; `--todo/--done/--issue/--reviewed` show exactly
+the selected states (combinable). This keeps long ROADMAPs cheap to read.
 
 Batch state (`batch-start` / `batch-end` / `ensure` / `role-join` / `show` /
 `status`) lives in `.w1mer/STATE.json` — a per-task ledger of base/end commits,
