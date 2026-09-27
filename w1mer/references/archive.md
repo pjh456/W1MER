@@ -17,13 +17,18 @@ w1mer new <type> [--parent <id>] [--title "..."] [--doc "..." (task)]
                                   [--section perf|bug|feature|infra|backlog (task)]
                                   [--state <s>]   # default: type's first state
 w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
+                                   [--register-if-missing (task)
+                                    --title "..." --doc "..." --section <s>]
 w1mer list [--type <type>] [--sort tree]
 w1mer build                      # regenerate all INDEX files
 w1mer sync [--apply]             # compact deltas into stable codebase docs
 ```
 
 `task` rows live in `ROADMAP.md`; `set task 01 --state done --effect "+22%"`
-updates a row directly. Other types are per-entry files.
+updates a row directly. With `--register-if-missing`, a missing row is
+registered first (state `todo`, then the given `--state`/`--effect` applied),
+so a reviewer can append a follow-up sub-id in one call. Other types are
+per-entry files.
 
 Cell escaping: table cells are escaped on write (`|` → `\|`, `\` → `\\`)
 and unescaped on read, so titles/effects may contain `|`. Hand-editing a row

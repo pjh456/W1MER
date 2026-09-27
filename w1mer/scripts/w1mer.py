@@ -371,11 +371,21 @@ def add_roadmap_task(cwd, args):
     if nid in ids:
         sys.exit(f"error: task {nid} already exists")
     section = args.section or "perf"
+    title = args.title or f"task {nid}"
+    doc = args.doc or "—"
+    insert_roadmap_row(cwd, nid, title, doc, section)
+    print(f"added task {nid}: {title}  [{section}]")
+
+
+def insert_roadmap_row(cwd, nid, title, doc, section):
+    """Insert a task row with an explicit id into the section, pre-order sorted."""
+    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    text = road.read_text(encoding="utf-8")
+    if nid in task_existing_ids(text):
+        sys.exit(f"error: task {nid} already exists")
     marker = f"<!-- w1mer:task:{section} -->"
     if marker not in text:
         sys.exit(f"error: ROADMAP.md missing marker {marker} (sections: perf/bug/feature/infra/backlog)")
-    title = args.title or f"task {nid}"
-    doc = args.doc or "—"
     line = f"| {nid} | {esc_cell(title)} | {esc_cell(doc)} | todo | |"
     pos = text.index(marker) + len(marker)
     lines = text[pos:].split("\n")
@@ -396,7 +406,6 @@ def add_roadmap_task(cwd, args):
     block = "\n".join(task_rows) + "\n\n" + "\n".join(tail).rstrip() + "\n"
     text = text[:pos] + "\n" + block
     road.write_text(text, encoding="utf-8")
-    print(f"added task {nid}: {title}  [{section}]")
 
 
 def task_row_key(row):
@@ -415,7 +424,7 @@ def find_file(tdef, cfg, nid):
 def cmd_set(cwd, cfg, args):
     tdef = get_type(cfg, args.type)
     if args.type == "task":
-        if not args.state and not args.effect:
+        if not args.state and not args.effect and not args.register_if_missing:
             sys.exit("error: provide --state and/or --effect for task rows")
         set_roadmap_task(cwd, args)
         return
@@ -434,7 +443,8 @@ def cmd_set(cwd, cfg, args):
 
 def set_roadmap_task(cwd, args):
     """Update a task row in ROADMAP.md: status (--state) and/or effect (--effect).
-    Row format: | id | task | doc | status | effect |"""
+    Row format: | id | task | doc | status | effect |
+    With --register-if-missing, a missing row is registered first (state todo)."""
     road = Path(cwd) / ".w1mer" / "ROADMAP.md"
     if not road.exists():
         sys.exit("error: .w1mer/ROADMAP.md missing (run 'w1mer init')")
@@ -442,7 +452,18 @@ def set_roadmap_task(cwd, args):
     pattern = re.compile(rf"^(\| {re.escape(str(args.id))} \|)([^\n]*?)(\|)$", re.M)
     m = pattern.search(text)
     if not m:
-        sys.exit(f"error: task {args.id} not found in ROADMAP.md")
+        if not args.register_if_missing:
+            sys.exit(f"error: task {args.id} not found in ROADMAP.md")
+        nid = str(args.id)
+        if not re.fullmatch(r"\d+(?:\.\d+)*", nid):
+            sys.exit(f"error: task id '{nid}' is not a valid hierarchical id (e.g. 05, 05.1)")
+        section = args.section or "perf"
+        insert_roadmap_row(cwd, nid, args.title or f"task {nid}", args.doc or "—", section)
+        print(f"registered task {nid} in ROADMAP.md  [{section}]")
+        text = road.read_text(encoding="utf-8")
+        m = pattern.search(text)
+        if not m:
+            sys.exit(f"error: task {args.id} not found in ROADMAP.md")
     cells = [c.strip() for c in split_cells(m.group(2))]
     # cells: [task, doc, status, effect?]; pad to 4
     while cells and cells[0] == "":
@@ -639,6 +660,11 @@ def main():
     p_set.add_argument("id")
     p_set.add_argument("--state", default=None)
     p_set.add_argument("--effect", default=None, help="effect summary (task rows only)")
+    p_set.add_argument("--register-if-missing", dest="register_if_missing", action="store_true",
+                      help="task: register the row in ROADMAP.md first if it is missing")
+    p_set.add_argument("--title", default=None, help="title (register-if-missing only)")
+    p_set.add_argument("--doc", default=None, help="doc column (register-if-missing only)")
+    p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (register-if-missing only)")
 
     p_list = sub.add_parser("list", help="list entries")
     p_list.add_argument("--type", default=None)
