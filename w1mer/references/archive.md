@@ -46,6 +46,22 @@ Cell escaping: table cells are escaped on write (`|` → `\|`, `\` → `\\`)
 and unescaped on read, so titles/effects may contain `|`. Hand-editing a row
 with a raw `|` in a cell breaks the row — go through the CLI.
 
+## CLI defaults
+
+`schema.yaml` can pre-set subcommand flags under a top-level `defaults:`
+block. Precedence: **command line > `defaults:` > intrinsic default**. Example:
+
+```yaml
+defaults:
+  set:
+    register_if_missing: true   # `set task` auto-registers a missing row
+  new:
+    section: perf
+```
+
+Only defaultable flags participate (currently `new`/`set`: `section`, `state`,
+`register_if_missing`). A command-line flag always wins over the default.
+
 ## Type registry
 
 Types are declared in `.w1mer/schema.yaml` (self-contained with the archive).

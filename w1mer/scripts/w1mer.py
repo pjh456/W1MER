@@ -80,6 +80,10 @@ def parse_yaml(text):
                 value = [v.strip().strip("\"'") for v in value[1:-1].split(",") if v.strip()]
             elif value:
                 value = value.strip("\"'")
+                if value == "true":
+                    value = True
+                elif value == "false":
+                    value = False
             container[key] = value
         elif line.endswith(":"):
             key = line[:-1].strip()
@@ -103,6 +107,29 @@ def get_type(cfg, name):
     if name not in types:
         sys.exit(f"error: unknown type '{name}'. Known: {', '.join(types)}")
     return types[name]
+
+
+# ---------------------------------------------------------------------------
+# defaults (schema.yaml 'defaults' block)
+# ---------------------------------------------------------------------------
+#
+# CLI default behaviors: flags pre-set for a subcommand. Precedence:
+#   command line  >  schema.yaml defaults  >  intrinsic default
+# A defaultable flag uses argparse default=None as a "not given" sentinel;
+# apply_defaults resolves it once, after parsing.
+
+
+DEFAULTABLE = {
+    "set": {"register_if_missing": False, "section": None},
+    "new": {"section": None, "state": None},
+}
+
+
+def apply_defaults(args, cfg):
+    cfgd = cfg.get("defaults", {}).get(args.cmd, {})
+    for flag, intrinsic in DEFAULTABLE.get(args.cmd, {}).items():
+        if getattr(args, flag, None) is None:
+            setattr(args, flag, cfgd.get(flag, intrinsic))
 
 
 # ---------------------------------------------------------------------------
@@ -989,8 +1016,9 @@ def main():
     p_set.add_argument("id")
     p_set.add_argument("--state", default=None)
     p_set.add_argument("--effect", default=None, help="effect summary (task rows only)")
-    p_set.add_argument("--register-if-missing", dest="register_if_missing", action="store_true",
-                      help="task: register the row in ROADMAP.md first if it is missing")
+    p_set.add_argument("--register-if-missing", dest="register_if_missing",
+                       action="store_true", default=None,
+                       help="task: register the row in ROADMAP.md first if it is missing")
     p_set.add_argument("--title", default=None, help="title (register-if-missing only)")
     p_set.add_argument("--doc", default=None, help="doc column (register-if-missing only)")
     p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (register-if-missing only)")
@@ -1026,6 +1054,7 @@ def main():
         cmd_role_join(Path.cwd(), args)
         return
     cfg = load_config(Path.cwd())
+    apply_defaults(args, cfg)
     if args.cmd == "new":
         cmd_new(Path.cwd(), cfg, args)
     elif args.cmd == "set":

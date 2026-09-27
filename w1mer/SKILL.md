@@ -109,8 +109,10 @@ w1mer sync [--apply]                               # compact deltas into stable 
 ```
 
 The type registry lives in `.w1mer/schema.yaml` (directory, file-naming pattern,
-state machine). States live in YAML frontmatter of content files — content is
-the source of truth; INDEX files are build artifacts (single-direction sync).
+state machine). An optional `defaults:` block pre-sets subcommand flags
+(command line always wins). States live in YAML frontmatter of content files —
+content is the source of truth; INDEX files are build artifacts (single-direction
+sync).
 
 ## Layered codebase docs
 

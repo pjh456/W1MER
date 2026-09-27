@@ -38,3 +38,11 @@ types:
     file: "{id}_{slug}.md"
     index: [id, title, state, doc]
     states: [active, archived]
+
+# CLI default behaviors: flags pre-set for a subcommand.
+# Precedence: command line > defaults > intrinsic default.
+# defaults:
+#   set:
+#     register_if_missing: true   # `set task` auto-registers a missing ROADMAP row
+#   new:
+#     section: perf
