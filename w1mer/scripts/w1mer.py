@@ -1025,39 +1025,34 @@ def cmd_list(cwd, cfg, args):
         list_codebase_modules(cwd)
 
 
-TASK_SECTIONS = ("perf", "bug", "feature", "infra", "backlog")
-
-
 def list_roadmap_tasks(cwd, shown):
-    """Print task rows in pick order: section order (perf > bug > feature >
-    infra > backlog), within a section open rows by (defer desc, id asc),
-    closed rows below by id. The top open row is marked `*` (next pick)."""
+    """Print task rows in pick order: sections in file order (marker order =
+    priority order; the template puts perf first, backlog last), within a
+    section open rows by (defer desc, id asc), closed rows below by id. The
+    top open row is marked `*` (next pick)."""
     road = Path(cwd) / PLANNING_DIR / "ROADMAP.md"
     if not road.exists():
         return
     text = road.read_text(encoding="utf-8")
     rows = []
     for section, pos, i, region_end, srows in roadmap_sections(text):
-        if section not in TASK_SECTIONS:
-            continue
         for r in srows:
             nid, cells = row_cells(r)
             if nid and cells[2] in shown:
-                rows.append((TASK_SECTIONS.index(section), nid, cells[2],
-                            int(cells[3] or 0), cells[0]))
+                rows.append((section, nid, cells[2], int(cells[3] or 0), cells[0]))
     if not rows:
         return
     print("\n[task]")
     ordered = []
-    for si in range(len(TASK_SECTIONS)):
-        sec = [r for r in rows if r[0] == si]
+    for section in dict.fromkeys(r[0] for r in rows):  # file order, unique
+        sec = [r for r in rows if r[0] == section]
         open_r = sorted((r for r in sec if r[2] in ("todo", "issue")),
                        key=lambda r: (-r[3], task_id_key(r[1])))
         closed_r = sorted((r for r in sec if r[2] in ("done", "reviewed")),
                           key=lambda r: task_id_key(r[1]))
         ordered.extend(open_r + closed_r)
     next_marked = False
-    for si, nid, status, defer, title in ordered:
+    for section, nid, status, defer, title in ordered:
         star = ""
         if not next_marked and status in ("todo", "issue"):
             star = "*"
@@ -1225,7 +1220,7 @@ def main():
     p_new.add_argument("--slug", default=None, help="file slug (overrides auto from title)")
     p_new.add_argument("--domain", default=None, help="perf domain")
     p_new.add_argument("--state", default=None, help="initial state (default: type's first state)")
-    p_new.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog")
+    p_new.add_argument("--section", default=None, help="task section (marker in ROADMAP.md; template: perf/bug/feature/infra/backlog)")
 
     p_set = sub.add_parser("set", help="update an entry's state (task also accepts --effect)")
     p_set.add_argument("type")
@@ -1237,7 +1232,7 @@ def main():
                        help="task: register the row in ROADMAP.md first if it is missing")
     p_set.add_argument("--title", default=None, help="title (register-if-missing only)")
     p_set.add_argument("--doc", default=None, help="doc column (register-if-missing only)")
-    p_set.add_argument("--section", default=None, help="task section: perf/bug/feature/infra/backlog (move the row; register-if-missing only)")
+    p_set.add_argument("--section", default=None, help="task section (marker in ROADMAP.md; template: perf/bug/feature/infra/backlog) — move the row; register-if-missing only")
 
     p_defer = sub.add_parser("defer", help="increment a task row's defer counter (orchestrator skipped it)")
     p_defer.add_argument("id", help="task id")

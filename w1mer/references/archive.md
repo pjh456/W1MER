@@ -14,7 +14,8 @@ indexes.
 w1mer init                       # scaffold the planning directory from templates
 w1mer new <type> [--parent <id>] [--title "..."] [--doc "..." (task)]
                                   [--slug <text>] [--domain <d> (perf)]
-                                  [--section perf|bug|feature|infra|backlog (task)]
+                                  [--section <s> (task: marker in ROADMAP.md;
+                                  template: perf/bug/feature/infra/backlog)]
                                   [--state <s>]   # default: type's first state
 w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
                                    [--section <s> (task: move the row across

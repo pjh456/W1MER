@@ -1,6 +1,8 @@
 # {project} — Roadmap
 
-> Section order = kind priority (performance > bug fixes > features).
+> Section order in the file = priority order (the template puts performance
+> first, backlog last); custom sections work the same way — `list` and
+> `re-rank` follow file order.
 > Within a section, open rows are ranked by `Defer` (desc), then ID.
 > `Defer` counts how many times the task was skipped (`w1mer defer <id>`).
 > Each completed task: mark `[x]` + date + commit, add a one-line measured
