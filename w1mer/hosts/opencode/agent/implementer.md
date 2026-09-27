@@ -25,8 +25,8 @@ agent compiles or writes code while you work.
   `w1mer role-join <task> <role>` to record your liveness for the batch
   completeness gate.
 - Read the plan doc for your task first; read the stable codebase docs in
-  fixed order `STACK → STRUCTURE → ARCHITECTURE → INTEGRATIONS → CONVENTIONS`
-  before touching code.
+  fixed order `STACK → STRUCTURE → CONVENTIONS` + the module doc
+  (`codebase/<module>.md`) before touching code.
 - Self-verify before committing: build + relevant tests + lints (e.g. `cargo
   build` + `cargo test -p <crate>` + no new clippy warnings).
 - Commit atomically: one logical change = one commit, semantic message, no

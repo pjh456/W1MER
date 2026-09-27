@@ -23,8 +23,8 @@ next implementer can start writing code immediately (investigation lead time).
 - Investigate the assigned task: approach, risk list, change surface, expected
   value.
 - Read the stable codebase docs first, in fixed order:
-  `STACK → STRUCTURE → ARCHITECTURE → INTEGRATIONS → CONVENTIONS`, then target
-  code as needed.
+  `STACK → STRUCTURE → CONVENTIONS`, then the doc of the module you touch
+  (`codebase/<module>.md`), then target code as needed.
 - Write your full analysis directly to the archive (`w1mer new perf/detail
   --title ...` or the bug-reason doc), then report a compressed conclusion:
   plan location, approach summary, risks, expected value.

@@ -844,6 +844,27 @@ def task_shown_set(args):
     return selected or {"todo", "issue"}
 
 
+def list_codebase_modules(cwd):
+    idx = Path(cwd) / PLANNING_DIR / "codebase" / "INDEX.md"
+    if not idx.exists():
+        return
+    rows = []
+    for line in idx.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\|(.+)\|\s*$", line)
+        if not m:
+            continue
+        cells = [c.strip() for c in m.group(1).split("|")]
+        if len(cells) < 3 or cells[0] == "module" or set(cells[0]) <= {"-"}:
+            continue
+        rows.append(cells)
+    if rows:
+        print("\n[codebase]")
+    for cells in rows:
+        module, doc = cells[0], cells[1]
+        sync = cells[2] if len(cells) > 2 else ""
+        print(f"  {module:<12} {doc:<24} {sync}")
+
+
 def cmd_list(cwd, cfg, args):
     if args.type:
         types = {args.type: get_type(cfg, args.type)}
@@ -862,6 +883,8 @@ def cmd_list(cwd, cfg, args):
         for nid in preorder_sort(files, tdef.get("domains")):
             meta, _ = read_frontmatter(files[nid])
             print(f"  {nid:<8} {meta.get('state','?'):<14} {meta.get('title','')}")
+    if not args.type:
+        list_codebase_modules(cwd)
 
 
 def list_roadmap_tasks(cwd, shown):
@@ -912,15 +935,30 @@ def cmd_build(cwd, cfg):
         print(f"built {rel}  ({len(rows)} rows)")
 
 
-STABLE_DOCS = ("STACK", "STRUCTURE", "ARCHITECTURE", "INTEGRATIONS", "CONVENTIONS")
+def codebase_modules(cwd):
+    """Module names from codebase/INDEX.md — the `sync` tag namespace."""
+    idx = Path(cwd) / PLANNING_DIR / "codebase" / "INDEX.md"
+    if not idx.exists():
+        return []
+    mods = []
+    for line in idx.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^\|(.+)\|\s*$", line)
+        if not m:
+            continue
+        cells = [c.strip() for c in m.group(1).split("|")]
+        if len(cells) < 2 or cells[0] == "module" or set(cells[0]) <= {"-"}:
+            continue
+        mods.append(cells[0])
+    return mods
 
 
 def cmd_sync(cwd, cfg, args):
     """Compact: merge architecture-impact deltas from detail/CHANGES.md into
-    the stable codebase docs. Each delta line is tagged:
-      - [ARCHITECTURE] contract X changed
-    Untagged lines are listed as 'unassigned'. --apply writes the deltas
-    under a dated heading in each target doc and clears CHANGES.md."""
+    the per-module codebase docs. Each delta line is tagged:
+      - [gc] contract X changed
+    (module names from codebase/INDEX.md). Untagged lines are listed as
+    'unassigned'. --apply writes the deltas under a dated heading in each
+    target doc and clears CHANGES.md."""
     root = Path(cwd) / PLANNING_DIR
     changes = root / "detail" / "CHANGES.md"
     if not changes.exists():
@@ -939,16 +977,17 @@ def cmd_sync(cwd, cfg, args):
     if not deltas:
         print("no deltas in detail/CHANGES.md")
         return
-    tagged = {d: [] for d in STABLE_DOCS}
+    modules = codebase_modules(cwd)
+    tagged = {d: [] for d in modules}
     unassigned = []
     for d in deltas:
-        m = re.match(r"^\[(\w+)\]\s*(.*)$", d)
+        m = re.match(r"^\[([A-Za-z0-9_.-]+)\]\s*(.*)$", d)
         if m and m.group(1) in tagged:
             tagged[m.group(1)].append(m.group(2))
         else:
             unassigned.append(d)
     if not args.apply:
-        for doc in STABLE_DOCS:
+        for doc in modules:
             if tagged[doc]:
                 print(f"-> {doc}.md")
                 for t in tagged[doc]:
@@ -959,18 +998,18 @@ def cmd_sync(cwd, cfg, args):
                 print(f"    {t}")
         print("(dry run; use --apply to write)")
         return
-    # apply: append dated heading + deltas to each stable doc, then clear CHANGES
+    # apply: append dated heading + deltas to each module doc, then clear CHANGES
     today = datetime.date.today().isoformat()
-    for doc in STABLE_DOCS:
-        if not tagged[doc]:
+    for module in modules:
+        if not tagged[module]:
             continue
-        path = root / "codebase" / f"{doc}.md"
+        path = root / "codebase" / f"{module}.md"
         if not path.exists():
             sys.exit(f"error: {path} missing")
-        block = "\n".join(f"- {t}" for t in tagged[doc])
+        block = "\n".join(f"- {t}" for t in tagged[module])
         text = path.read_text(encoding="utf-8").rstrip() + f"\n\n## Compact {today}\n\n{block}\n"
         path.write_text(text, encoding="utf-8")
-        print(f"updated {doc}.md  (+{len(tagged[doc])} deltas)")
+        print(f"updated {module}.md  (+{len(tagged[module])} deltas)")
     new_body = body
     new_body = re.sub(r"(?ms)^## Deltas\n\n- .*$", "## Deltas\n\n- (empty)", new_body)
     write_frontmatter(changes, meta, new_body)

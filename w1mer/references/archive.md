@@ -28,7 +28,7 @@ w1mer status                                 # current batch state + completenes
 w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
                                     # task default: todo+issue
 w1mer build                      # regenerate all INDEX files
-w1mer sync [--apply]             # compact deltas into stable codebase docs
+w1mer sync [--apply]             # compact deltas into per-module codebase docs
 ```
 
 `task` rows live in `ROADMAP.md`; `set task 01 --state done --effect "+22%"`

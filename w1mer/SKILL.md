@@ -119,30 +119,28 @@ sync).
 
 Codebase docs split into two layers for provider context-cache friendliness:
 
-- **Stable layer** (fixed read order `STACK → STRUCTURE → ARCHITECTURE →
-  INTEGRATIONS → CONVENTIONS`): long-lived maps, rarely change — a stable
-  prompt prefix that hits caches.
+- **Stable layer** (`.w1mer/codebase/`): overview docs `STACK → STRUCTURE →
+  CONVENTIONS` (fixed read order — a stable prompt prefix that hits caches)
+  + one doc per module (`<module>.md`), read on demand for the module
+  touched.
 - **Dynamic layer** (recent changes, field details): isolated, never inserted
   into the stable prefix; read on demand via the CLI.
 
-Writes are throttled: the Reviewer records a short architecture-impact note in
-its review doc; a periodic **compact** merges deltas into the stable docs and
-clears the changelog.
+Writes are throttled: the Reviewer records a short architecture-impact note
+in its review doc; a periodic **compact** merges deltas into the target
+module doc and clears the changelog.
 
 ## Map codebase
 
-Initialize or refresh the stable layer (`.w1mer/codebase/`) with **3 parallel
-read-only mappers**, one per focus area:
+Initialize or refresh `.w1mer/codebase/` with a **map-reduce flow**: the
+orchestrator does the cheap global scan (overview docs + module registry),
+then spawns **one read-only mapper per module** (parallel) — each reads only
+its module, writes `codebase/<module>.md`, and returns a short contract
+report; the orchestrator assembles the cross-module flow in `STRUCTURE.md`
+from the reports. No mapper ever reads the whole codebase.
 
-```
-mapper-tech  → STACK.md, INTEGRATIONS.md
-mapper-arch  → ARCHITECTURE.md, STRUCTURE.md
-mapper-conv  → CONVENTIONS.md
-```
-
-Mappers write documents directly and return confirmations only. Run after
-`w1mer init` and after major refactors. Full spec in
-`references/map-codebase.md`.
+Run after `w1mer init` and after major refactors (re-map affected modules
+only). Full spec in `references/map-codebase.md`.
 
 ## Details
 
