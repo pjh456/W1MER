@@ -12,6 +12,7 @@ Commands:
   batch-end <task>        explicitly close the current task (end = HEAD)
   ensure <task>           idempotently make this task current (subagent startup)
   role-join <task> <role> mark a role as launched (subagent startup)
+  show <task>             show a task's committed diff (base..end) / a file
   status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
   set <type> <id> --state <state>   update an entry's state
@@ -530,6 +531,50 @@ def cmd_role_join(cwd, args):
     print(f"role {args.role} joined for {args.task}")
 
 
+def cmd_show(cwd, cfg, args):
+    """Show a task's committed work: the cumulative diff base..end, a --stat
+    summary, or a single file's content at an endpoint (--file).
+
+    The diff is the net change of every commit in the batch (git diff over a
+    range, not concatenated git show), with the planning dir excluded so the
+    review diff is code-only. --file reads from the git object, never the
+    working tree, so it is unaffected by the implementer's in-flight edits."""
+    state = load_state(cwd)
+    entry = state["tasks"].get(args.task)
+    if entry is None:
+        sys.exit(f"error: task {args.task} not in STATE.json")
+    base, end = entry.get("base"), entry.get("end")
+    if not base:
+        sys.exit(f"error: task {args.task} has no base (run batch-start/ensure first)")
+
+    if args.file:
+        commit = end if args.at == "end" else base
+        if not commit:
+            sys.exit(f"error: task {args.task} has no {args.at} commit (in progress?)")
+        out = subprocess.run(["git", "show", f"{commit}:{args.file}"],
+                             cwd=cwd, capture_output=True, text=True)
+        if out.returncode != 0:
+            sys.exit(f"error: {out.stderr.strip()}")
+        sys.stdout.write(out.stdout)
+        return
+
+    if end is None:
+        sys.exit(f"error: task {args.task} is in progress (end not set); nothing to show")
+    exclude = cfg.get("planning_dir", ".w1mer")
+    argv = ["git", "diff"]
+    if args.stat:
+        argv.append("--stat")
+    argv += [f"{base}..{end}", "--", ".", f":!{exclude}"]
+    out = subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
+    if out.stdout:
+        sys.stdout.write(out.stdout)
+    if out.returncode != 0:
+        sys.stderr.write(out.stderr)
+        sys.exit(out.returncode)
+    if not out.stdout.strip():
+        print(f"(no changes in {base[:7]}..{end[:7]} outside {exclude})")
+
+
 def cmd_status(cwd, args):
     """Show the current batch state and its derived completeness."""
     state = load_state(cwd)
@@ -911,6 +956,13 @@ def main():
     p_ens.add_argument("--type", default="main", choices=["main", "sub"],
                       help="batch type (main|sub); picks the expected roles")
 
+    p_show = sub.add_parser("show", help="show a task's committed diff (base..end) or a file at an endpoint")
+    p_show.add_argument("task")
+    p_show.add_argument("--stat", action="store_true", help="summary only")
+    p_show.add_argument("--file", default=None, help="show a file's content at an endpoint instead of the diff")
+    p_show.add_argument("--at", default="end", choices=["base", "end"],
+                        help="which endpoint for --file (default end)")
+
     sub.add_parser("status", help="show current batch state + completeness")
 
     p_rj = sub.add_parser("role-join", help="mark a role as launched (subagent startup)")
@@ -984,6 +1036,8 @@ def main():
         cmd_list(Path.cwd(), cfg, args)
     elif args.cmd == "build":
         cmd_build(Path.cwd(), cfg)
+    elif args.cmd == "show":
+        cmd_show(Path.cwd(), cfg, args)
     elif args.cmd == "sync":
         cmd_sync(Path.cwd(), cfg, args)
 
