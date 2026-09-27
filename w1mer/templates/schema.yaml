@@ -8,14 +8,14 @@ types:
     dir: "ROADMAP.md"           # special: single table file, one row per task
     id: "{seq:02}"              # 01, 02, ...; children via --parent (05.1, 05.1.1)
     index: [id, title, status, effect]
-    states: [todo, doing, done, pending-review, reviewed, reviewed-issues, fixed, re-reviewed]
+    states: [todo, doing, done, pending-review, reviewed, reviewed-issues]
 
   review:
     dir: "review"
     id: "R_{roadmap}"           # derived from parent task id; "." -> "_"
     file: "{id}.md"
     index: [id, task, state, doc]
-    states: [pending, ok, issues, fixed, re-reviewed]
+    states: [pending, ok, issues]
 
   bug:
     dir: "bug_reason"

@@ -756,6 +756,10 @@ def cmd_set(cwd, cfg, args):
     if args.type == "task":
         if not args.state and not args.effect and not args.register_if_missing:
             sys.exit("error: provide --state and/or --effect for task rows")
+        if args.state:
+            states = tdef.get("states", [])
+            if states and args.state not in states:
+                sys.exit(f"error: state '{args.state}' not in {states}")
         set_roadmap_task(cwd, args)
         return
     if not args.state:

@@ -6,7 +6,7 @@
 
 ## Status states
 
-`pending` `ok` `issues` `fixed` `re-reviewed`
+`pending` `ok` `issues`
 
 ## Review docs
 

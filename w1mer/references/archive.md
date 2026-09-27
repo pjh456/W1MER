@@ -74,7 +74,7 @@ types:
     id: "R_{roadmap}"            # derived from parent task id; "." → "_"
     file: "{id}.md"
     index: [id, task, state, doc]   # INDEX table columns
-    states: [pending, ok, issues, fixed, re-reviewed]
+    states: [pending, ok, issues]
   bug:
     dir: "bug_reason"
     id: "B{seq:03}"              # auto-incrementing sequence

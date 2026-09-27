@@ -17,6 +17,7 @@ report.
 - Read the review doc (`R_<task>.md`) and fix exactly its findings.
 - Self-verify before committing (build + tests + no new lint warnings).
 - Commit atomically: one logical change = one commit, semantic message.
-- Update the review doc state to `fixed` + commit; report compressed results.
+- Update the review doc state to `pending` (for re-review) + commit; report
+  compressed results.
 - The next main-batch Reviewer will re-review your fixes (closed loop).
 """

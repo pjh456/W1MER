@@ -14,7 +14,7 @@
 
 ## Status states
 
-`todo` `doing` `done` `pending-review` `reviewed` `reviewed-issues` `fixed` `re-reviewed`
+`todo` `doing` `done` `pending-review` `reviewed` `reviewed-issues`
 
 ## 一、Performance
 
