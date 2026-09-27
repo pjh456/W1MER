@@ -9,6 +9,7 @@ Commands:
   init                    scaffold .w1mer/ from templates + copy w1mer.yaml
   install                 install host agents + CLI launcher (--host, --link)
   batch-start <task>      record the batch boundary commit (STATE.json)
+  role-join <task> <role> mark a role as launched (subagent startup)
   status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
   set <type> <id> --state <state>   update an entry's state
@@ -442,6 +443,31 @@ def cmd_batch_start(cwd, args):
     print(f"batch-start {args.task}  base={head[:7]}  type={ttype}")
 
 
+def cmd_role_join(cwd, args):
+    """Mark a role as launched for the current task (subagent startup ritual).
+
+    Idempotent: re-joining keeps the original 'at' timestamp (first-write-wins),
+    so 'at' stays the true first-join time."""
+    with locked(cwd):
+        state = load_state(cwd)
+        entry = state["tasks"].get(args.task)
+        if entry is None:
+            sys.exit(f"error: task {args.task} not in STATE.json (run 'batch-start' or 'ensure' first)")
+        expected = EXPECTED_ROLES.get(entry.get("type", "main"), [])
+        if args.role not in expected:
+            sys.exit(f"error: role '{args.role}' not expected for {entry['type']} batch (expected: {', '.join(expected)})")
+        if entry.get("end") is not None:
+            sys.exit(f"error: task {args.task} already closed (end set); late join is a protocol violation")
+        info = entry["roles"].setdefault(args.role, {"joined": False, "at": None})
+        if info["joined"]:
+            print(f"role {args.role} already joined for {args.task} (no-op)")
+            return
+        info["joined"] = True
+        info["at"] = now_iso()
+        save_state(cwd, state)
+    print(f"role {args.role} joined for {args.task}")
+
+
 def cmd_status(cwd, args):
     """Show the current batch state and its derived completeness."""
     state = load_state(cwd)
@@ -817,6 +843,10 @@ def main():
 
     sub.add_parser("status", help="show current batch state + completeness")
 
+    p_rj = sub.add_parser("role-join", help="mark a role as launched (subagent startup)")
+    p_rj.add_argument("task")
+    p_rj.add_argument("role")
+
     p_install = sub.add_parser("install", help="install host agents + CLI launcher")
     p_install.add_argument("--host", default="opencode", help="opencode | claude-code | codex | all (default: opencode)")
     p_install.add_argument("--no-cli", action="store_true", help="skip installing the w1mer CLI launcher")
@@ -865,6 +895,9 @@ def main():
         return
     if args.cmd == "status":
         cmd_status(Path.cwd(), args)
+        return
+    if args.cmd == "role-join":
+        cmd_role_join(Path.cwd(), args)
         return
     cfg = load_config(Path.cwd())
     if args.cmd == "new":
