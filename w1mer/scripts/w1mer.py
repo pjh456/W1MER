@@ -19,6 +19,7 @@ Commands:
   list [--type <type>]    list entries (task default: todo+issue; --all /
                                     --todo/--done/--issue/--reviewed to filter)
   defer <id>              increment a task row's defer counter (it was skipped)
+  re-rank                 re-sort ROADMAP sections by (defer desc, id asc)
   build                   regenerate all INDEX files
 """
 
@@ -843,6 +844,86 @@ def cmd_defer(cwd, args):
     print(f"task {args.id}: defer -> {n}")
 
 
+def task_id_key(nid):
+    return tuple(int(p) for p in str(nid).split("."))
+
+
+def roadmap_sections(text):
+    """Yield (section, marker_end, row_start, row_end, rows) per
+    `<!-- w1mer:task:<s> -->` marker; rows = contiguous task-row lines after
+    the marker (blank lines between marker and rows are skipped)."""
+    out = []
+    for m in re.finditer(r"<!-- w1mer:task:(\w+) -->", text):
+        pos = m.end()
+        lines = text[pos:].split("\n")
+        i = 0
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        region_end = i
+        while region_end < len(lines) and re.match(r"^\| \d", lines[region_end]):
+            region_end += 1
+        out.append((m.group(1), pos, i, region_end, lines[i:region_end]))
+    return out
+
+
+def row_cells(row):
+    """(id, cells) from a task row; cells padded to [task, doc, status, defer, effect]."""
+    m = re.match(r"^\| (\d+(?:\.\d+)*) \|(.*)\|$", row)
+    if not m:
+        return None, None
+    nid = m.group(1)
+    cells = [c.strip() for c in split_cells(m.group(2))]
+    while cells and cells[0] == "":
+        cells.pop(0)
+    while len(cells) < 5:
+        cells.append("")
+    return nid, cells
+
+
+def fmt_row(nid, cells):
+    return "| " + nid + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
+
+
+def re_rank_roadmap(text):
+    """Re-sort each section: open rows (todo/issue) by (defer desc, id asc);
+    closed rows (done/reviewed) sink below them, id asc, defer reset to 0.
+    Returns (new_text, [(section, open_order), ...]) for changed sections."""
+    moves = []
+    for section, pos, i, region_end, rows in reversed(roadmap_sections(text)):
+        parsed = [row_cells(r) for r in rows]
+        parsed = [(nid, c) for nid, c in parsed if nid]
+        open_rows = [(n, c) for n, c in parsed if c[2] in ("todo", "issue")]
+        closed_rows = [(n, c) for n, c in parsed if c[2] in ("done", "reviewed")]
+        open_rows.sort(key=lambda nc: (-int(nc[1][3] or 0), task_id_key(nc[0])))
+        closed_rows.sort(key=lambda nc: task_id_key(nc[0]))
+        for _, c in closed_rows:
+            c[3] = "0"
+        new_rows = [fmt_row(n, c) for n, c in open_rows + closed_rows]
+        if new_rows != rows:
+            lines = text[pos:].split("\n")
+            lines[i:region_end] = new_rows
+            text = text[:pos] + "\n".join(lines)
+            moves.append((section, [n for n, _ in open_rows]))
+    return text, moves
+
+
+def cmd_re_rank(cwd, args):
+    """Deterministic re-rank: no judgment, only the (defer desc, id asc)
+    order within each section. Run at batch boundaries before picking the
+    next task."""
+    road = Path(cwd) / PLANNING_DIR / "ROADMAP.md"
+    if not road.exists():
+        sys.exit("error: .w1mer/ROADMAP.md missing (run 'w1mer init')")
+    text = road.read_text(encoding="utf-8")
+    new_text, moves = re_rank_roadmap(text)
+    road.write_text(new_text, encoding="utf-8")
+    if moves:
+        for section, order in moves:
+            print(f"{section}: " + ", ".join(order))
+    else:
+        print("no changes")
+
+
 def preorder_sort(ids, domain_order=None):
     def key(i):
         s = str(i)
@@ -1110,6 +1191,8 @@ def main():
     p_defer = sub.add_parser("defer", help="increment a task row's defer counter (orchestrator skipped it)")
     p_defer.add_argument("id", help="task id")
 
+    p_rr = sub.add_parser("re-rank", help="re-sort ROADMAP sections by (defer desc, id asc); closed rows sink")
+
     p_list = sub.add_parser("list", help="list entries")
     p_list.add_argument("--type", default=None)
     p_list.add_argument("--all", action="store_true", help="task: show all four states")
@@ -1161,6 +1244,8 @@ def main():
         cmd_sync(Path.cwd(), cfg, args)
     elif args.cmd == "defer":
         cmd_defer(Path.cwd(), args)
+    elif args.cmd == "re-rank":
+        cmd_re_rank(Path.cwd(), args)
 
 
 if __name__ == "__main__":
