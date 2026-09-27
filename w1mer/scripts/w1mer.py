@@ -8,7 +8,8 @@ files are build artifacts (single-direction sync).
 Commands:
   init                    scaffold .w1mer/ from templates + copy w1mer.yaml
   install                 install host agents + CLI launcher (--host, --link)
-  batch-start <task>      record the batch boundary commit (STATE.json)
+  batch-start <task>      record the batch boundary commit (gates completeness)
+  batch-end <task>        explicitly close the current task (end = HEAD)
   role-join <task> <role> mark a role as launched (subagent startup)
   status                  show current batch state + completeness
   new <type> [args]       create an entry (auto-increments the id)
@@ -233,6 +234,12 @@ EXPECTED_ROLES = {
 }
 
 
+def missing_roles(entry):
+    """Expected roles for a task entry that have not joined (derived, not stored)."""
+    expected = EXPECTED_ROLES.get(entry.get("type", "main"), [])
+    return [r for r in expected if not entry.get("roles", {}).get(r, {}).get("joined")]
+
+
 def state_path(cwd):
     return Path(cwd) / ".w1mer" / STATE_NAME
 
@@ -420,17 +427,28 @@ def cmd_batch_start(cwd, args):
 
     Idempotent: re-running keeps the existing base (first-write-wins) and the
     existing role-join records, so a subagent can safely run it on the main
-    agent's behalf."""
+    agent's behalf.
+
+    Completeness gate: leaving a task requires all its expected roles to have
+    joined, EXCEPT when the new task is a sub-id of it (05 -> 05.1) — that is
+    the repair sub-batch, which exists precisely because the parent is
+    incomplete."""
     ttype = args.type
     head = git_head(cwd)
     with locked(cwd):
         state = load_state(cwd)
         tasks = state["tasks"]
         prev = state.get("current")
-        # close out the previous task, if this is a genuine transition
-        if prev and prev != args.task and prev in tasks and tasks[prev].get("end") is None:
-            tasks[prev]["end"] = head
-            tasks[prev]["ended"] = now_iso()
+        if prev and prev != args.task and prev in tasks:
+            if tasks[prev].get("end") is None:
+                tasks[prev]["end"] = head
+                tasks[prev]["ended"] = now_iso()
+            missing = missing_roles(tasks[prev])
+            if missing and not args.task.startswith(prev + "."):
+                save_state(cwd, state)  # persist the close, then block
+                sys.exit(f"error: previous task {prev} INCOMPLETE (missing roles: "
+                         f"{', '.join(missing)}); repair it via sub-batch "
+                         f"{prev}.1 before starting {args.task}")
         if args.task in tasks:
             entry = tasks[args.task]
             if entry.get("base") is None:
@@ -441,6 +459,25 @@ def cmd_batch_start(cwd, args):
         state["current"] = args.task
         save_state(cwd, state)
     print(f"batch-start {args.task}  base={head[:7]}  type={ttype}")
+
+
+def cmd_batch_end(cwd, args):
+    """Explicitly close the current task: end = HEAD. First-write-wins."""
+    head = git_head(cwd)
+    with locked(cwd):
+        state = load_state(cwd)
+        if state.get("current") != args.task:
+            sys.exit(f"error: task {args.task} is not the current task (current: {state.get('current')})")
+        entry = state["tasks"].get(args.task)
+        if entry is None:
+            sys.exit(f"error: task {args.task} not in STATE.json")
+        if entry.get("end") is not None:
+            print(f"task {args.task} already closed (no-op)")
+            return
+        entry["end"] = head
+        entry["ended"] = now_iso()
+        save_state(cwd, state)
+    print(f"batch-end {args.task}  end={head[:7]}")
 
 
 def cmd_role_join(cwd, args):
@@ -488,7 +525,7 @@ def cmd_status(cwd, args):
         info = entry.get("roles", {}).get(r, {})
         mark = "ok     " if info.get("joined") else "MISSING"
         print(f"  role {r:<12} {mark}  {info.get('at') or ''}")
-    missing = [r for r in expected if not entry.get("roles", {}).get(r, {}).get("joined")]
+    missing = missing_roles(entry)
     if entry.get("end") is None:
         print("  status: IN PROGRESS (end not set)")
     elif missing:
@@ -836,10 +873,13 @@ def main():
 
     p_init = sub.add_parser("init", help="scaffold .w1mer/ from templates")
 
-    p_bs = sub.add_parser("batch-start", help="record the batch boundary commit")
+    p_bs = sub.add_parser("batch-start", help="record the batch boundary commit (gates completeness)")
     p_bs.add_argument("task", help="task id being started")
     p_bs.add_argument("--type", default="main", choices=["main", "sub"],
                      help="batch type (main|sub); picks the expected roles")
+
+    p_be = sub.add_parser("batch-end", help="explicitly close the current task (end = HEAD)")
+    p_be.add_argument("task")
 
     sub.add_parser("status", help="show current batch state + completeness")
 
@@ -892,6 +932,9 @@ def main():
         return
     if args.cmd == "batch-start":
         cmd_batch_start(Path.cwd(), args)
+        return
+    if args.cmd == "batch-end":
+        cmd_batch_end(Path.cwd(), args)
         return
     if args.cmd == "status":
         cmd_status(Path.cwd(), args)
