@@ -17,6 +17,8 @@ w1mer new <type> [--parent <id>] [--title "..."] [--doc "..." (task)]
                                   [--section perf|bug|feature|infra|backlog (task)]
                                   [--state <s>]   # default: type's first state
 w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
+                                   [--section <s> (task: move the row across
+                                    sections — re-prioritization)]
                                    [--register-if-missing (task)
                                     --title "..." --doc "..." --section <s>]
 w1mer batch-start <task> [--type main|sub]  # record batch boundary, gate completeness

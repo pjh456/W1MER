@@ -20,6 +20,7 @@ Commands:
                                     --todo/--done/--issue/--reviewed to filter)
   defer <id>              increment a task row's defer counter (it was skipped)
   re-rank                 re-sort ROADMAP sections by (defer desc, id asc)
+  sync [--apply]          compact CHANGES.md deltas into per-module codebase docs
   build                   regenerate all INDEX files
 """
 
@@ -1253,7 +1254,7 @@ def main():
 
     sub.add_parser("build", help="regenerate INDEX files")
 
-    p_sync = sub.add_parser("sync", help="compact architecture deltas into stable codebase docs")
+    p_sync = sub.add_parser("sync", help="compact architecture deltas into per-module codebase docs")
     p_sync.add_argument("--apply", action="store_true", help="write deltas + clear CHANGES (default: dry run)")
 
     args = p.parse_args()

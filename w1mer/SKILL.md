@@ -112,7 +112,7 @@ w1mer list [--type <type>] [--all|--todo/--done/--issue/--reviewed]
 w1mer defer <task>                # a task was skipped (promotion step)
 w1mer re-rank                     # re-sort sections by (defer desc, id asc)
 w1mer build                                        # regenerate all INDEX files
-w1mer sync [--apply]                               # compact deltas into stable docs
+w1mer sync [--apply]                               # compact deltas into per-module codebase docs
 ```
 
 The type registry lives in `.w1mer/schema.yaml` (directory, file-naming pattern,
@@ -157,7 +157,7 @@ orchestration, then as needed:
 - `references/scheduling.md` — batch lifecycle, interrupt recovery, context.
 - `references/archive.md` — CLI reference, type registry, ID rules.
 - `references/codebase.md` — layered docs, compact flow, cache strategy.
-- `references/map-codebase.md` — parallel stable-layer mapping.
+- `references/map-codebase.md` — map-reduce per-module mapping.
 
 Host-specific agent definitions live in `hosts/` (opencode, claude-code,
 codex), shipped inside the skill. Install the skill (e.g. `npx skills add
