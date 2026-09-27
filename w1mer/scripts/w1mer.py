@@ -827,7 +827,7 @@ def set_roadmap_task(cwd, args):
         cells[2] = args.state
     if args.effect:
         cells[4] = args.effect
-    new_row = "| " + str(args.id) + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
+    new_row = fmt_row(str(args.id), cells)
     text = text[: m.start()] + new_row + text[m.end():]
     road.write_text(text, encoding="utf-8")
     print(f"task {args.id}: state={cells[2]} effect={cells[4]}")
@@ -855,7 +855,7 @@ def cmd_defer(cwd, args):
         sys.exit(f"error: task {args.id} defer cell is not a number: {cells[3]!r}")
     n = int(cells[3]) + 1
     cells[3] = str(n)
-    new_row = "| " + str(args.id) + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
+    new_row = fmt_row(str(args.id), cells)
     road.write_text(text[: m.start()] + new_row + text[m.end():], encoding="utf-8")
     print(f"task {args.id}: defer -> {n}")
 
@@ -906,7 +906,10 @@ def row_cells(row):
 
 
 def fmt_row(nid, cells):
-    return "| " + nid + " | " + " | ".join(esc_cell(c) for c in cells) + " |"
+    body = " | ".join(esc_cell(c) for c in cells)
+    if cells[-1] == "":
+        body = body[:-3]
+    return f"| {nid} | {body} |"
 
 
 def re_rank_roadmap(text):
