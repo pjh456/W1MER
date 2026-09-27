@@ -19,6 +19,12 @@ w1mer new <type> [--parent <id>] [--title "..."] [--doc "..." (task)]
 w1mer set <type> <id> --state <state> [--effect "..." (task rows)]
                                    [--register-if-missing (task)
                                     --title "..." --doc "..." --section <s>]
+w1mer batch-start <task> [--type main|sub]  # record batch boundary, gate completeness
+w1mer batch-end <task>                       # close current task (end = HEAD)
+w1mer ensure <task> [--type main|sub]        # idempotent batch-start (subagent startup)
+w1mer role-join <task> <role>                # record role liveness
+w1mer show <task> [--stat] [--file <p> --at base|end]
+w1mer status                                 # current batch state + completeness
 w1mer list [--type <type>] [--sort tree]
 w1mer build                      # regenerate all INDEX files
 w1mer sync [--apply]             # compact deltas into stable codebase docs
@@ -29,6 +35,12 @@ updates a row directly. With `--register-if-missing`, a missing row is
 registered first (state `todo`, then the given `--state`/`--effect` applied),
 so a reviewer can append a follow-up sub-id in one call. Other types are
 per-entry files.
+
+Batch state (`batch-start` / `batch-end` / `ensure` / `role-join` / `show` /
+`status`) lives in `.w1mer/STATE.json` — a per-task ledger of base/end commits,
+role liveness, and timing. It is machine-maintained: agents only touch it
+through the CLI. See `references/scheduling.md` (Batch lifecycle) for the
+protocol and the completeness gate.
 
 Cell escaping: table cells are escaped on write (`|` → `\|`, `\` → `\\`)
 and unescaped on read, so titles/effects may contain `|`. Hand-editing a row

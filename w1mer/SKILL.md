@@ -67,6 +67,22 @@ Explorer     investigates the next task               (read-only)
 - Implementer, working tree dirty / Fixer → dispatch a Fixer to finish the
   half-done work (a repair job stays a Fixer's job).
 
+**Batch lifecycle** — batch boundaries are recorded in `.w1mer/STATE.json` by
+the CLI, not by the orchestrator's memory (this is what keeps the protocol
+intact when the orchestrator is compacted):
+
+- The orchestrator runs `w1mer batch-start <task>` before launching the batch
+  and `w1mer batch-end <task>` after the batch's commits.
+- Every sub-agent runs `w1mer ensure <task>` + `w1mer role-join <task> <role>`
+  on startup (idempotent — does `batch-start` on the orchestrator's behalf if
+  it was compacted).
+- `batch-start` gates completeness: it refuses to leave a task whose expected
+  roles did not join — a dropped implementer is exposed at the next boundary.
+- `w1mer show <task>` reads the committed diff / file content at an endpoint
+  from git objects, so readers never see the implementer's in-flight edits.
+
+Full protocol in `references/scheduling.md` (Batch lifecycle).
+
 ## Task IDs
 
 Tasks use **unbounded rolling hierarchical IDs**: `05`, `05.1`, `05.1.1`, ...
@@ -85,6 +101,8 @@ by hand-editing indexes:
 w1mer init                    # scaffold the planning directory
 w1mer new <type> [--parent <id>] [--title "..."]   # create an entry
 w1mer set <type> <id> --state <state>              # update state
+w1mer batch-start <task>     # record batch boundary (STATE.json)
+w1mer show <task>            # committed diff / file at an endpoint
 w1mer list [--type <type>]                         # list entries
 w1mer build                                        # regenerate all INDEX files
 w1mer sync [--apply]                               # compact deltas into stable docs

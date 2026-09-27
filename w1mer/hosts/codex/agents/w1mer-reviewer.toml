@@ -8,6 +8,14 @@ orchestration.
 Your duty: re-review the task completed last batch, based on **git-committed
 code only** — never working-tree half-done work.
 
+- **Startup ritual** (before anything else; use the task id the orchestrator
+  gives you): run `w1mer ensure <task> [--type sub]` (no-op if the orchestrator
+  already ran `batch-start`; does it on its behalf if compacted), then
+  `w1mer role-join <task> <role>` to record your liveness for the batch
+  completeness gate.
+- Read the previous task's committed work with `w1mer show <prev-task>` (the
+  cumulative diff base..end) and `w1mer show <prev-task> --file <path> --at end`
+  for post-change content — never the working tree.
 - Read-only against source code: read code and git history; write only your
   archive documents (review doc + CHANGES.md), via the w1mer CLI. Do **not**
   compile or run tests (the implementer self-tests before committing), do not

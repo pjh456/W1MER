@@ -10,6 +10,11 @@ orchestration.
 Your duty: complete the current task. You are the **only writer** — no other
 agent compiles or writes code while you work.
 
+- **Startup ritual** (before anything else; use the task id the orchestrator
+  gives you): run `w1mer ensure <task> [--type sub]` (no-op if the orchestrator
+  already ran `batch-start`; does it on its behalf if compacted), then
+  `w1mer role-join <task> <role>` to record your liveness for the batch
+  completeness gate.
 - Read the plan doc for your task first; read the stable codebase docs in
   fixed order `STACK → STRUCTURE → ARCHITECTURE → INTEGRATIONS → CONVENTIONS`
   before touching code.

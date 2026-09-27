@@ -37,6 +37,40 @@ Once fixed, development returns to the main batch; the next Reviewer
 re-reviews the Fixer's committed fixes. Depending on complexity, sub batches
 can nest inside sub batches (e.g. when a fix introduces a new problem).
 
+## Batch lifecycle (state protocol)
+
+Batch boundaries live in `.w1mer/STATE.json` (commits, role liveness, timing),
+maintained by the CLI — not by the orchestrator's memory. This is what keeps
+the protocol intact when the orchestrator is compacted mid-run.
+
+**Orchestrator** (main agent):
+
+- Before launching a batch: `w1mer batch-start <task> [--type sub]` — records
+  the base commit, closes the previous task, and gates completeness (below).
+- After the batch's commits: `w1mer batch-end <task>` (or let the next
+  `batch-start` close it).
+- `w1mer status` when in doubt about where the batch is.
+
+**Sub-agents** (reviewer / implementer / explorer / fixer):
+
+- On startup: `w1mer ensure <task> [--type sub]`, then `w1mer role-join <task>
+  <role>`. `ensure` is idempotent — a no-op if the orchestrator already ran
+  `batch-start`; if the orchestrator was compacted and never ran it, the
+  sub-agent does it on its behalf.
+
+**Completeness gate**: `batch-start` refuses to leave a task whose expected
+roles did not all `role-join` (main: reviewer, implementer, explorer; sub:
+reviewer, fixer). This is what makes a dropped implementer *visible*: the next
+`batch-start` blocks with `INCOMPLETE (missing roles: implementer)`. The only
+way past an incomplete task is a repair sub-batch on its sub-id (`05` →
+`05.1`), which the gate allows.
+
+**Reading committed work**: `w1mer show <task>` prints the cumulative diff
+`base..end` (planning dir excluded); `w1mer show <task> --file <path> --at
+base|end` reads a file at an endpoint. The Reviewer reads `end`; the Explorer
+reads `base`. Both read git objects, never the working tree — so the
+implementer's in-flight edits are invisible to them.
+
 ## Interrupt recovery
 
 An agent that exits abnormally / returns empty is treated as an *unfinished

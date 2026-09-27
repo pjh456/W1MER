@@ -12,6 +12,19 @@ contract; host adapters (`hosts/`) map them to the host's agent mechanism.
 | **Explorer** | Investigate the next task, write a plan | read-only | plan doc |
 | **Fixer** | Fix review issues / finish half-done work (sub-batch only) | read + write + commit | code + commit + updated review doc |
 
+## Startup ritual (all roles)
+
+Every role, before anything else, runs with the task id the orchestrator
+gives it:
+
+1. `w1mer ensure <task> [--type sub]` — make the task current (idempotent;
+   does `batch-start` on the orchestrator's behalf if it was compacted).
+2. `w1mer role-join <task> <role>` — record liveness so the batch completeness
+   gate can verify the batch is whole.
+
+See `references/scheduling.md` (Batch lifecycle) for the orchestrator side and
+the completeness gate.
+
 ## Reviewer
 
 - **Review basis is git-committed code, never working-tree half-done work.**

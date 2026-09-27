@@ -10,6 +10,15 @@ orchestration.
 Your duty: investigate the **next** task before it becomes current, so the
 next implementer can start writing code immediately (investigation lead time).
 
+- **Startup ritual** (before anything else; use the task id the orchestrator
+  gives you): run `w1mer ensure <task> [--type sub]` (no-op if the orchestrator
+  already ran `batch-start`; does it on its behalf if compacted), then
+  `w1mer role-join <task> <role>` to record your liveness for the batch
+  completeness gate.
+- Read the codebase at the batch baseline, not the working tree (the
+  implementer is writing it): `w1mer show <task> --file <path> --at base` for a
+  file, or get the base hash from `w1mer status` and use `git show <base>:<path>`
+  / `git grep <pat> <base>`.
 - Read-only. Do not write code, do not compile, do not commit.
 - Investigate the assigned task: approach, risk list, change surface, expected
   value.
