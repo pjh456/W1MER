@@ -2,7 +2,7 @@
 
 > Lower number = higher priority. Priorities: performance > bug fixes > features.
 > Each completed task: mark `[x]` + date + commit, add a one-line measured
-> effect summary and `pending-review`; full data goes to the results archive.
+> effect summary and `done`; full data goes to the results archive.
 > Insert new items with derived sub-ids (`05.1`, `05.1.2`); never batch-renumber.
 
 ## ID rules
@@ -14,7 +14,7 @@
 
 ## Status states
 
-`todo` `doing` `done` `pending-review` `reviewed` `reviewed-issues`
+`todo` `done` `reviewed` `issue`
 
 ## 一、Performance
 
