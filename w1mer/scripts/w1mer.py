@@ -1021,22 +1021,44 @@ def cmd_list(cwd, cfg, args):
         list_codebase_modules(cwd)
 
 
+TASK_SECTIONS = ("perf", "bug", "feature", "infra", "backlog")
+
+
 def list_roadmap_tasks(cwd, shown):
-    road = Path(cwd) / ".w1mer" / "ROADMAP.md"
+    """Print task rows in pick order: section order (perf > bug > feature >
+    infra > backlog), within a section open rows by (defer desc, id asc),
+    closed rows below by id. The top open row is marked `*` (next pick)."""
+    road = Path(cwd) / PLANNING_DIR / "ROADMAP.md"
     if not road.exists():
         return
+    text = road.read_text(encoding="utf-8")
     rows = []
-    for line in road.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"^\| (\d+(?:\.\d+)*) \|(.*)\|$", line)
-        if m:
-            cells = [c.strip() for c in split_cells(m.group(2))]
-            # cells: [task, doc, status, effect?]
-            if len(cells) >= 3 and cells[2] in shown:
-                rows.append((m.group(1), cells[2], cells[0]))
-    if rows:
-        print("\n[task]")
-    for nid, status, title in sorted(rows, key=lambda r: tuple(int(p) for p in r[0].split("."))):
-        print(f"  {nid:<8} {status:<14} {title}")
+    for section, pos, i, region_end, srows in roadmap_sections(text):
+        if section not in TASK_SECTIONS:
+            continue
+        for r in srows:
+            nid, cells = row_cells(r)
+            if nid and cells[2] in shown:
+                rows.append((TASK_SECTIONS.index(section), nid, cells[2],
+                            int(cells[3] or 0), cells[0]))
+    if not rows:
+        return
+    print("\n[task]")
+    ordered = []
+    for si in range(len(TASK_SECTIONS)):
+        sec = [r for r in rows if r[0] == si]
+        open_r = sorted((r for r in sec if r[2] in ("todo", "issue")),
+                       key=lambda r: (-r[3], task_id_key(r[1])))
+        closed_r = sorted((r for r in sec if r[2] in ("done", "reviewed")),
+                          key=lambda r: task_id_key(r[1]))
+        ordered.extend(open_r + closed_r)
+    next_marked = False
+    for si, nid, status, defer, title in ordered:
+        star = ""
+        if not next_marked and status in ("todo", "issue"):
+            star = "*"
+            next_marked = True
+        print(f"  {star:<2} {nid:<8} {status:<10} defer={defer:<2} {title}")
 
 
 def cmd_build(cwd, cfg):
