@@ -85,6 +85,20 @@ stage*, recovered per role:
      the Implementer's reporting duty
 3. Fixer: dispatch a Fixer to resume the repair
 
+### Persona persistence under long context compression
+
+In practice, an AI gradually loses its role after many context compressions
+and eventually the loop collapses — so a programmatic flow is needed to keep
+it in check.
+
+When using the CLI, the AI is re-prompted to manually open the corresponding
+batch and cross-check the list of agents that have not joined, and the batch
+must be closed manually after it ends.
+
+This process significantly improves the main agent's persona persistence over
+long-running development. In testing, role retention went from about 7
+consecutive compression loops to **theoretically unlimited**.
+
 ### Rolling hierarchical IDs
 
 Tasks use unbounded rolling numeric IDs (`05`, `05.1`, `05.1.1`, ...). Any
@@ -113,7 +127,14 @@ Agents no longer need to read how to maintain this machinery one by one; they
 participate directly through the CLI, staying crash-free and highly available
 over the long run.
 
-### Cache-friendly layered codebase docs
+Tasks themselves are divided into four states:
+
+- `todo`: not yet implemented
+- `done`: completed but not yet reviewed
+- `reviewed`: confirmed clean by review; can stay as is
+- `issue`: review found problems; waiting for the Fixer to re-implement
+
+### Bill-friendly layered codebase docs
 
 As a project iterates, the traditional "write codebase once, use everywhere"
 approach actually adds noise.
@@ -124,10 +145,11 @@ them back to stale docs that then force them to read even more source code.
 
 W1MER's codebase docs are split into two layers:
 
-- **Stable layer** (fixed read order `STACK → STRUCTURE → ARCHITECTURE →
-  INTEGRATIONS → CONVENTIONS`): a long-lived project map, designed to change
-  rarely. The fixed read order yields a stable prompt prefix that reliably
-  hits provider context caches.
+- **Stable layer**: a long-lived project map, designed to change rarely, split
+  into per-module docs so an update never needs to cross documents — which
+  also cuts the input/output cost and context demand of a rebuild. The
+  overview docs (`STACK → STRUCTURE → CONVENTIONS`) keep a fixed read order,
+  forming a stable prompt prefix that reliably hits provider context caches.
 - **Dynamic layer** (recent changes, field details): fully isolated from the
   stable layer, forming its own document series, also queryable quickly via
   the CLI.
@@ -136,8 +158,7 @@ In every **main batch**, the Reviewer also watches for architecture changes,
 summarizing a brief architecture-impact note in the review document.
 
 Architecture docs are updated periodically: increments are merged into the
-stable documents and the changelog is cleared. This reduces cache misses and
-extra output, keeping the bill friendly.
+stable documents and the changelog is cleared.
 
 ## Install
 
@@ -163,13 +184,13 @@ itself from `~/.agents/skills/` (USER scope) automatically.
 ```
 W1MER/
 ├── README.md           # this file (English)
-├── docs/               # paradigm & operating specs
+├── docs/               # READMEs
 │   └── README-zh.md    # Chinese README
 └── w1mer/              # the skill package (self-contained; install whole dir)
     ├── SKILL.md        #   skill entry (Anthropic Agent Skills format)
-    ├── references/     #   roles / scheduling / archive / codebase specs
+    ├── references/     #   roles / scheduling / archive / codebase / mapping specs
     ├── templates/      #   .w1mer/ scaffold + schema.yaml registry
-    ├── scripts/        #   w1mer.py CLI (init/install/new/set/list/build/sync)
+    ├── scripts/        #   w1mer.py CLI (init/install/new/set/defer/re-rank/list/build/sync, batch lifecycle batch-start/batch-end/ensure/role-join/show/status)
     └── hosts/          #   host-specific agent definitions
         ├── opencode/   #     .opencode/agent/*.md (install → ~/.config/opencode/agents/)
         ├── claude-code/    #   .claude/agents/*.md
@@ -178,5 +199,16 @@ W1MER/
 
 ## Status
 
-Design phase. The paradigm spec lives in `docs/`; the archive CLI is a
-skeleton — feedback and contributions welcome.
+In production use, participating in long-term development and maintenance of:
+
+- [OxideJS](https://github.com/pjh456/OxideJS/): a Rust-based JavaScript execution engine
+- [pjh_cli](https://github.com/pjh456/pjh_cli/): a C++20-based cross-platform CLI toolkit
+
+## FAQ
+
+### Does W1MER interfere with other skills?
+
+W1MER only constrains a project's development conventions and does not affect
+knowledge-type skills. However, combining it with skills that impose their own
+orchestration flow (e.g. Oh-My-Opencode) is not recommended — that combination
+is untested and unsupported, i.e. undefined behavior.

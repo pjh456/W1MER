@@ -27,7 +27,7 @@
 
 项目的开发被分为多个 **主批次** 和 **次批次**，每个批次以实现一个任务为中心。
 
-通常情况下，Agent 在 **主批次** 下运行，进行三并发调度，
+通常情况下，Agent 在 **主批次** 下运行，进行三并发调度。
 
 每个 **主批次** 并行运行三个 Agent，各处理不同的职责：
 
@@ -56,9 +56,17 @@ Explorer（探索者）：调查下一任务（只读，写方案）
 
 1. Explorer/Reviewer：重新启动
 2. Implementer：先看工作区
-   - 干净（没有做一半的工作）：重新启动 Implementer 重做该任务
-   - 脏（存在做一半的工作）：派一个 Fixer Agent 去修写一半的内容，同时承担 Implementer 的汇报职责
+    - 干净（没有做一半的工作）：重新启动 Implementer 重做该任务
+    - 脏（存在做一半的工作）：派一个 Fixer Agent 去补完做一半的工作，同时承担 Implementer 的汇报职责
 3. Fixer：派一个 Fixer 继续修复
+
+### 长期压缩上下文环境下的人格保持
+
+实际使用中，AI 会在多次压缩上下文后逐渐丢失角色，最终导致循环崩溃，因此需要有一个程序化流程来对其进行约束。
+
+在使用 CLI 工具时，AI 会被重新提示要求手动开启对应批次，并核对未开启 Agent 名单，在批次结束后也需要手动关闭。
+
+这一过程有效提高了主 Agent 在长线开发中的人格保持度，经测试，角色保持从约连续 7 次压缩循环提升至如今的 **理论上无限次**。
 
 ### 滚动层级编号
 
@@ -78,7 +86,14 @@ W1MER 提供了一套可复用的系列文档操作方式，把这种复杂但�
 
 每个 Agent 不再需要一个个去读怎么维护这套架构，而是通过 CLI 工具直接参与其中，做到长期不崩溃、持续高可用。
 
-### 缓存友好的分层 codebase 文档
+任务本身被划分为 `todo`, `done`, `reviewed`, `issue` 四类：
+
+- `todo`: 尚未实现的待做项
+- `done`: 已完成但未经审查的项
+- `reviewed`: 经审查无误后可以保持不变的项
+- `issue`: 经审查发现问题，等待 Fixer 在再次实现的项
+
+### 账单友好的分层 codebase 文档
 
 在项目的持续迭代过程中，传统的“一次 codebase，到处使用”反而会增加噪音。
 
@@ -86,12 +101,12 @@ W1MER 提供了一套可复用的系列文档操作方式，把这种复杂但�
 
 W1MER 的 codebase 文档分两层：
 
-- **稳定层**（固定阅读顺序的 `STACK → STRUCTURE → ARCHITECTURE → INTEGRATIONS → CONVENTIONS`）：长期存活的项目地图，设计为极少变化。阅读顺序固定带来的是稳定的 prompt 前缀，能有效命中供应商上下文缓存。
-- **动态层**（近期变更、领域细节）：与稳定层完全隔离，形成一套系列文档体系，也可以用 CLI 工具快速查询。
+- **稳定层**：长期存活的项目地图，设计较少变化，且根据模块进行文档拆分，避免更新时需要跨文档更新，也降低了重建时的输入与输出成本和模型上下文要求；overview 文档（`STACK → STRUCTURE → CONVENTIONS`）保持固定阅读顺序，形成稳定的 prompt 前缀以命中上下文缓存；
+- **动态层**：与稳定层完全隔离，形成一套系列文档体系，也可以用 CLI 工具快速查询。
 
 每个 **主批次** 中，Reviewer 还承担着观察架构变化的职责，在审查文档里总结一栏简要的架构变化摘要。
 
-架构文档的更新定期进行，把增量合并进稳定文档并清空变更日志。减少了缓存失配和额外输出的次数，保持了账单友好。
+架构文档的更新定期进行，把增量合并进稳定文档并清空变更日志。
 
 ## 安装
 
@@ -113,9 +128,9 @@ W1MER/
 │   └── README-zh.md    # 中文版 README
 └── w1mer/              # skill 包（自包含；整体复制即可安装）
     ├── SKILL.md        #   skill 入口（Anthropic Agent Skills 格式）
-    ├── references/     #   角色 / 调度 / 归档 / codebase 规范
+    ├── references/     #   角色 / 调度 / 归档 / codebase / 映射规范
     ├── templates/      #   .w1mer/ 脚手架 + schema.yaml 注册表
-    ├── scripts/        #   w1mer.py CLI（init/install/new/set/list/build/sync）
+    ├── scripts/        #   w1mer.py CLI（init/install/new/set/defer/re-rank/list/build/sync，批次生命周期 batch-start/batch-end/ensure/role-join/show/status）
     └── hosts/          #   宿主特定的 agent 定义
         ├── opencode/   #     .opencode/agent/*.md（install → ~/.config/opencode/agents/）
         ├── claude-code/    #   .claude/agents/*.md
@@ -124,4 +139,13 @@ W1MER/
 
 ## 状态
 
-设计阶段。范式规范位于 `docs/`；归档 CLI 为骨架——欢迎反馈与贡献。
+已经投入实际应用环境，并在下列项目中参与长期开发维护：
+
+- [OxideJS](https://github.com/pjh456/OxideJS/): 基于 Rust 的 JavaScript 执行引擎
+- [pjh_cli](https://github.com/pjh456/pjh_cli/): 基于 C++20 的跨平台 CLI 工具集
+
+## 常见问题
+
+### W1MER 是否会影响其他 Skill 使用？
+
+W1MER 只约束了项目的开发规范，不会对知识类 Skill 造成影响。但不建议与 Oh-My-Opencode 等自定义编排流程的 Skill 结合使用，该操作属于未经测试与兜底的未定义行为。
